@@ -34,6 +34,18 @@
     const lastActivityDate =
         ref(null)
 
+    const createdAtFilter =
+        ref('all')
+
+    const createdAtDate =
+        ref(null)
+
+    const updatedAtFilter =
+        ref('all')
+
+    const updatedAtDate =
+        ref(null)
+
     onMounted(async () => {
         await usersStore.loadUsers()
     })
@@ -138,6 +150,98 @@
                         return false
                     }
 
+                    const createdAtDate_obj =
+                        user.createdAt
+                            ?.toDate?.()
+
+                    if (
+                        createdAtFilter.value ===
+                        'after' &&
+                        createdAtDate.value
+                    ) {
+                        if (!createdAtDate_obj) {
+                            return false
+                        }
+
+                        const filterDate =
+                            new Date(
+                                createdAtDate.value
+                            )
+
+                        if (
+                            createdAtDate_obj < filterDate
+                        ) {
+                            return false
+                        }
+                    }
+
+                    if (
+                        createdAtFilter.value ===
+                        'before' &&
+                        createdAtDate.value
+                    ) {
+                        if (!createdAtDate_obj) {
+                            return false
+                        }
+
+                        const filterDate =
+                            new Date(
+                                createdAtDate.value
+                            )
+
+                        if (
+                            createdAtDate_obj > filterDate
+                        ) {
+                            return false
+                        }
+                    }
+
+                    const updatedAtDate_obj =
+                        user.updatedAt
+                            ?.toDate?.()
+
+                    if (
+                        updatedAtFilter.value ===
+                        'after' &&
+                        updatedAtDate.value
+                    ) {
+                        if (!updatedAtDate_obj) {
+                            return false
+                        }
+
+                        const filterDate =
+                            new Date(
+                                updatedAtDate.value
+                            )
+
+                        if (
+                            updatedAtDate_obj < filterDate
+                        ) {
+                            return false
+                        }
+                    }
+
+                    if (
+                        updatedAtFilter.value ===
+                        'before' &&
+                        updatedAtDate.value
+                    ) {
+                        if (!updatedAtDate_obj) {
+                            return false
+                        }
+
+                        const filterDate =
+                            new Date(
+                                updatedAtDate.value
+                            )
+
+                        if (
+                            updatedAtDate_obj > filterDate
+                        ) {
+                            return false
+                        }
+                    }
+
                     return true
                 }
             )
@@ -179,6 +283,14 @@
         {
             title: 'Last Activity',
             key: 'lastActivityAt',
+        },
+        {
+            title: 'Created At',
+            key: 'createdAt',
+        },
+        {
+            title: 'Updated At',
+            key: 'updatedAt',
         },
         {
             title: '',
@@ -258,7 +370,52 @@
         " cols="12" md="3">
             <v-text-field v-model="lastActivityDate" label="Date" type="date" />
         </v-col>
-
+    </v-row>
+    <v-row class="mb-4">
+        <v-col cols="12" md="3">
+            <v-select v-model="createdAtFilter" label="Created At" :items="[
+                {
+                    title: 'All',
+                    value: 'all',
+                },
+                {
+                    title: 'Created After Date',
+                    value: 'after',
+                },
+                {
+                    title: 'Created Before Date',
+                    value: 'before',
+                },
+            ]" />
+        </v-col>
+        <v-col v-if="
+            createdAtFilter === 'after' ||
+            createdAtFilter === 'before'
+        " cols="12" md="3">
+            <v-text-field v-model="createdAtDate" label="Date" type="date" />
+        </v-col>
+        <v-col cols="12" md="3">
+            <v-select v-model="updatedAtFilter" label="Updated At" :items="[
+                {
+                    title: 'All',
+                    value: 'all',
+                },
+                {
+                    title: 'Updated After Date',
+                    value: 'after',
+                },
+                {
+                    title: 'Updated Before Date',
+                    value: 'before',
+                },
+            ]" />
+        </v-col>
+        <v-col v-if="
+            updatedAtFilter === 'after' ||
+            updatedAtFilter === 'before'
+        " cols="12" md="3">
+            <v-text-field v-model="updatedAtDate" label="Date" type="date" />
+        </v-col>
     </v-row>
     <v-alert type="info" variant="tonal" class="mb-4">
         Showing
@@ -310,6 +467,26 @@
                     ? item.lastActivityAt
                         .toDate()
                         .toLocaleDateString()
+                    : '-'
+            }}
+        </template>
+
+        <template v-slot:[`item.createdAt`]="{ item }">
+            {{
+                item.createdAt
+                    ? (item.createdAt.toDate
+                        ? item.createdAt.toDate().toLocaleDateString()
+                        : new Date(item.createdAt).toLocaleDateString())
+                    : '-'
+            }}
+        </template>
+
+        <template v-slot:[`item.updatedAt`]="{ item }">
+            {{
+                item.updatedAt
+                    ? (item.updatedAt.toDate
+                        ? item.updatedAt.toDate().toLocaleDateString()
+                        : new Date(item.updatedAt).toLocaleDateString())
                     : '-'
             }}
         </template>
