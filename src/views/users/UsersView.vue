@@ -8,11 +8,17 @@
     import { useUsersStore }
         from '@/stores/usersStore'
 
+    import { useLinksStore }
+        from '@/stores/linksStore'
+
     import UserDetailsDrawer
         from '@/components/users/UserDetailsDrawer.vue'
 
     const usersStore =
         useUsersStore()
+
+    const linksStore =
+        useLinksStore()
 
     const search = ref('')
 
@@ -21,6 +27,9 @@
 
     const proFilter =
         ref(null)
+
+    const linksCountFilter =
+        ref('all')
 
     const selectedUser =
         ref(null)
@@ -48,12 +57,18 @@
 
     onMounted(async () => {
         await usersStore.loadUsers()
+        
+        // Load links count for all users in parallel
+        const linksCounts = usersStore.users.map(user =>
+            linksStore.loadUserLinksCount(user.id)
+        )
+        await Promise.allSettled(linksCounts)
     })
 
     const filteredUsers =
         computed(() => {
-            return usersStore.users.filter(
-                user => {
+            return usersStore.users
+                .filter(user => {
                     const searchText =
                         search.value.toLowerCase()
 
@@ -242,9 +257,34 @@
                         }
                     }
 
+                    // Filter by links count
+                    const userLinksCount =
+                        linksStore.userLinksCount[
+                            user.id
+                        ] || 0
+
+                    if (
+                        linksCountFilter.value ===
+                        'no_links' &&
+                        userLinksCount !== 0
+                    ) {
+                        return false
+                    }
+
+                    if (
+                        linksCountFilter.value ===
+                        'has_links' &&
+                        userLinksCount === 0
+                    ) {
+                        return false
+                    }
+
                     return true
-                }
-            )
+                })
+                .map(user => ({
+                    ...user,
+                    linksCount: linksStore.userLinksCount[user.id] || 0,
+                }))
         })
 
     function viewUser(user) {
@@ -279,6 +319,10 @@
         {
             title: 'Pro',
             key: 'isPro',
+        },
+        {
+            title: 'Links',
+            key: 'linksCount',
         },
         {
             title: 'Last Activity',
@@ -338,6 +382,22 @@
                 },
             ]" />
 
+        </v-col>
+        <v-col cols="12" md="3">
+            <v-select v-model="linksCountFilter" label="Links Filter" :items="[
+                {
+                    title: 'All',
+                    value: 'all',
+                },
+                {
+                    title: 'No Links',
+                    value: 'no_links',
+                },
+                {
+                    title: 'Has Links',
+                    value: 'has_links',
+                },
+            ]" />
         </v-col>
         <v-col cols="12" md="3">
             <v-select v-model="lastActivityFilter" label="Last Activity" :items="[
@@ -454,6 +514,16 @@
                         ? 'Pro'
                         : 'Free'
                 }}
+            </v-chip>
+        </template>
+
+        <template v-slot:[`item.linksCount`]="{ item }">
+            <v-chip
+                :color="item.linksCount > 0 ? 'success' : 'grey'"
+                size="small"
+                variant="tonal"
+            >
+                {{ item.linksCount }}
             </v-chip>
         </template>
 
