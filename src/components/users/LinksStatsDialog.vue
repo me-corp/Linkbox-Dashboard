@@ -250,58 +250,94 @@ function truncateUrl(url, maxLength = 60) {
                                 class="mb-3 pb-3"
                                 :class="{ 'border-bottom': link !== folderGroup.links[folderGroup.links.length - 1] }"
                             >
-                                <!-- Link Title -->
-                                <div class="text-subtitle-2 font-weight-bold mb-1">
-                                    {{ link.title || link.url || 'Untitled Link' }}
-                                </div>
+                                <div class="d-flex gap-3">
+                                    <!-- Image Thumbnail -->
+                                    <div v-if="link.imageURL" class="flex-shrink-0">
+                                        <v-img
+                                            :src="link.imageURL"
+                                            :width="56"
+                                            :height="56"
+                                            cover
+                                            rounded="sm"
+                                            class="bg-grey-lighten-3"
+                                        >
+                                            <template v-slot:error>
+                                                <div class="d-flex align-center justify-center h-100">
+                                                    <v-icon size="small" color="grey">mdi-image-broken</v-icon>
+                                                </div>
+                                            </template>
+                                        </v-img>
+                                    </div>
 
-                                <!-- Link URL -->
-                                <div class="text-caption text-grey mb-2">
-                                    <v-icon size="x-small" class="mr-1">mdi-link</v-icon>
-                                    {{ truncateUrl(link.url) }}
-                                </div>
+                                    <div class="flex-grow-1 min-width-0">
+                                        <!-- Link Title + Status Badges -->
+                                        <div class="d-flex align-center gap-2 mb-1 flex-wrap">
+                                            <div class="text-subtitle-2 font-weight-bold">
+                                                {{ link.title || link.link || 'Untitled Link' }}
+                                            </div>
+                                            <v-chip
+                                                v-if="link.IsDeleted"
+                                                size="x-small"
+                                                color="error"
+                                                variant="tonal"
+                                            >
+                                                <v-icon size="x-small" start>mdi-delete-outline</v-icon>
+                                                Deleted
+                                            </v-chip>
+                                            <v-chip
+                                                v-if="link.IsHidden"
+                                                size="x-small"
+                                                color="warning"
+                                                variant="tonal"
+                                            >
+                                                <v-icon size="x-small" start>mdi-eye-off-outline</v-icon>
+                                                Hidden
+                                            </v-chip>
+                                        </div>
 
-                                <!-- Link Metadata -->
-                                <div class="d-flex flex-wrap gap-2 align-center mb-2">
-                                    <v-chip size="x-small" variant="outlined" v-if="link.createdAt">
-                                        <v-icon size="x-small" start>mdi-calendar</v-icon>
-                                        {{ formatDate(link.createdAt) }}
-                                    </v-chip>
+                                        <!-- Link URL -->
+                                        <div class="text-caption text-grey mb-2">
+                                            <v-icon size="x-small" class="mr-1">mdi-link</v-icon>
+                                            <a
+                                                :href="link.link"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="text-grey link-url"
+                                            >{{ truncateUrl(link.link) }}</a>
+                                        </div>
 
-                                    <v-chip size="x-small" variant="outlined" v-if="link.createdAt">
-                                        <v-icon size="x-small" start>mdi-clock-outline</v-icon>
-                                        {{ formatTime(link.createdAt) }}
-                                    </v-chip>
+                                        <!-- Link Metadata -->
+                                        <div class="d-flex flex-wrap gap-2 align-center mb-2">
+                                            <v-chip size="x-small" variant="outlined" v-if="link.createdAt">
+                                                <v-icon size="x-small" start>mdi-calendar</v-icon>
+                                                {{ formatDate(link.createdAt) }}
+                                            </v-chip>
 
-                                    <v-chip
-                                        v-if="link.description"
-                                        size="x-small"
-                                        variant="tonal"
-                                        color="info"
-                                    >
-                                        <v-icon size="x-small" start>mdi-note-outline</v-icon>
-                                        Has description
-                                    </v-chip>
+                                            <v-chip size="x-small" variant="outlined" v-if="link.createdAt">
+                                                <v-icon size="x-small" start>mdi-clock-outline</v-icon>
+                                                {{ formatTime(link.createdAt) }}
+                                            </v-chip>
 
-                                    <v-chip
-                                        v-if="link.tags && link.tags.length > 0"
-                                        size="x-small"
-                                        variant="tonal"
-                                        color="success"
-                                    >
-                                        <v-icon size="x-small" start>mdi-tag-outline</v-icon>
-                                        {{ link.tags.length }} tag{{ link.tags.length !== 1 ? 's' : '' }}
-                                    </v-chip>
-                                </div>
+                                            <v-chip
+                                                v-if="link.imageURL && link.imageWidth && link.imageHeight"
+                                                size="x-small"
+                                                variant="outlined"
+                                            >
+                                                <v-icon size="x-small" start>mdi-image-size-select-actual</v-icon>
+                                                {{ link.imageWidth }}×{{ link.imageHeight }}
+                                            </v-chip>
+                                        </div>
 
-                                <!-- Link Description Preview -->
-                                <div
-                                    v-if="link.description"
-                                    class="text-caption text-grey-lighten-1 pl-2 border-left border-grey"
-                                >
-                                    {{ link.description.substring(0, 150) }}{{
-                                        link.description.length > 150 ? '...' : ''
-                                    }}
+                                        <!-- Link Description Preview -->
+                                        <div
+                                            v-if="link.description"
+                                            class="text-caption text-grey-lighten-1 pl-2 border-left border-grey"
+                                        >
+                                            {{ link.description.substring(0, 150) }}{{
+                                                link.description.length > 150 ? '...' : ''
+                                            }}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -344,5 +380,21 @@ function truncateUrl(url, maxLength = 60) {
 
 .gap-2 {
     gap: 0.5rem;
+}
+
+.gap-3 {
+    gap: 0.75rem;
+}
+
+.min-width-0 {
+    min-width: 0;
+}
+
+.link-url {
+    text-decoration: none;
+}
+
+.link-url:hover {
+    text-decoration: underline;
 }
 </style>
