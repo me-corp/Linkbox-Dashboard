@@ -152,3 +152,97 @@ export function getSuggestedFix(user) {
 
   return updates
 }
+
+// folders & links should always carry these as explicit booleans
+const VISIBILITY_FLAGS = [
+  'isFavourite',
+  'isHidden',
+  'isPublic',
+]
+
+function isMissingFlag(value) {
+  return value !== true && value !== false
+}
+
+export function getFolderIssues(folder, audienceFolderIds) {
+  const issues = []
+
+  if (folder.storedId !== folder.id) {
+    issues.push({
+      key: 'invalid_id_field',
+      label: 'Missing/Invalid id Field',
+    })
+  }
+
+  if (!audienceFolderIds.has(folder.id)) {
+    issues.push({
+      key: 'missing_audience_mapping',
+      label: 'Missing Audience Mapping',
+    })
+  }
+
+  VISIBILITY_FLAGS.forEach(field => {
+    if (isMissingFlag(folder[field])) {
+      issues.push({
+        key: `missing_${field}`,
+        label: `Missing ${field}`,
+      })
+    }
+  })
+
+  return issues
+}
+
+export function getFolderSuggestedFix(folder) {
+  const updates = {}
+
+  if (folder.storedId !== folder.id) {
+    updates.id = folder.id
+  }
+
+  VISIBILITY_FLAGS.forEach(field => {
+    if (isMissingFlag(folder[field])) {
+      updates[field] = false
+    }
+  })
+
+  return updates
+}
+
+export function getLinkIssues(link) {
+  const issues = []
+
+  if (link.storedId !== link.id) {
+    issues.push({
+      key: 'invalid_id_field',
+      label: 'Missing/Invalid id Field',
+    })
+  }
+
+  VISIBILITY_FLAGS.forEach(field => {
+    if (isMissingFlag(link[field])) {
+      issues.push({
+        key: `missing_${field}`,
+        label: `Missing ${field}`,
+      })
+    }
+  })
+
+  return issues
+}
+
+export function getLinkSuggestedFix(link) {
+  const updates = {}
+
+  if (link.storedId !== link.id) {
+    updates.id = link.id
+  }
+
+  VISIBILITY_FLAGS.forEach(field => {
+    if (isMissingFlag(link[field])) {
+      updates[field] = false
+    }
+  })
+
+  return updates
+}

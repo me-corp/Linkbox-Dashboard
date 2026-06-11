@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/authStore'
+import { logout } from '@/services/authService'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -41,8 +42,9 @@ const navGroups = [
   },
 ]
 
-function handleLogout() {
-  authStore.logout()
+async function handleLogout() {
+  await logout()
+  authStore.setUser(null)
   router.push('/login')
 }
 </script>

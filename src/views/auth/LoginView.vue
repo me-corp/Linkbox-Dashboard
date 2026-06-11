@@ -1,18 +1,56 @@
 <script setup>
-  import { ref } from "vue";
+  import { ref, computed } from "vue";
   import { useRouter } from "vue-router";
+  import { useTheme } from "vuetify";
 
-  import { login } from "@/services/authService";
+  import { login, getAuthErrorMessage } from "@/services/authService";
   import { useAuthStore } from "@/stores/authStore";
 
   const router = useRouter();
   const authStore = useAuthStore();
+  const theme = useTheme();
 
   const email = ref("");
   const password = ref("");
+  const showPassword = ref(false);
 
   const isLoading = ref(false);
   const errorMessage = ref("");
+
+  const isDark = computed(() => theme.global.name.value === "dark");
+
+  function toggleTheme() {
+    const next = isDark.value ? "light" : "dark";
+    theme.global.name.value = next;
+    localStorage.setItem("themeMode", next);
+  }
+
+  const features = [
+    {
+      icon: "mdi-chart-line",
+      title: "Growth Tracking",
+      desc: "Signups, activation and DAU trends at a glance",
+      color: "primary",
+    },
+    {
+      icon: "mdi-fire",
+      title: "Retention Insights",
+      desc: "Cohort retention and churn signals over time",
+      color: "warning",
+    },
+    {
+      icon: "mdi-lightning-bolt-outline",
+      title: "Engagement Analytics",
+      desc: "Folder visits, link opens and feature usage",
+      color: "secondary",
+    },
+    {
+      icon: "mdi-crown-outline",
+      title: "Power Users",
+      desc: "Spot your most active and pro subscribers",
+      color: "brand-purple",
+    },
+  ];
 
   async function handleLogin() {
     errorMessage.value = "";
@@ -31,20 +69,14 @@
         password.value
       );
 
-      if (!user) {
-        errorMessage.value =
-          "Invalid credentials";
-        return;
-      }
-
-      authStore.login(user);
+      authStore.setUser(user);
 
       router.push("/");
     } catch (error) {
       console.error(error);
 
       errorMessage.value =
-        "Unable to sign in";
+        getAuthErrorMessage(error);
     } finally {
       isLoading.value = false;
     }
@@ -53,10 +85,32 @@
 
 <template>
   <v-container fluid class="fill-height pa-0 login-page">
+    <v-btn
+      :icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'"
+      variant="text"
+      color="primary"
+      class="theme-toggle"
+      @click="toggleTheme"
+    />
+
     <v-row no-gutters class="fill-height">
-      <v-col md="7" class="showcase-section">
-        <div class="showcase-content">
-          <div class="brand-tag">
+      <v-col md="7" class="hero-section">
+        <div class="hero-glow hero-glow-1" />
+        <div class="hero-glow hero-glow-2" />
+
+        <div class="hero-content">
+          <div class="hero-brand">
+            <div class="brand-mark brand-mark--lg">
+              <img src="@/assets/images/logo.png" />
+            </div>
+
+            <div>
+              <div class="hero-brand-name">LinkBox</div>
+              <div class="hero-brand-subtitle">Founder Dashboard</div>
+            </div>
+          </div>
+
+          <div class="hero-tag">
             LinkBox Metrics
           </div>
 
@@ -71,30 +125,28 @@
             need to make better product decisions.
           </p>
 
-          <div class="founder-principles">
-            <div class="principle">
-              User Analytics
+          <div class="hero-features">
+            <div v-for="feature in features" :key="feature.title" class="hero-feature">
+              <v-avatar
+                size="40"
+                rounded="lg"
+                class="hero-feature-icon"
+                :color="`rgb(var(--v-theme-${feature.color}))`"
+                variant="flat"
+              >
+                <v-icon :icon="feature.icon" size="20" color="white" />
+              </v-avatar>
+
+              <div>
+                <div class="hero-feature-title">
+                  {{ feature.title }}
+                </div>
+
+                <div class="hero-feature-desc">
+                  {{ feature.desc }}
+                </div>
+              </div>
             </div>
-
-            <div class="principle">
-              Folder Insights
-            </div>
-
-            <div class="principle">
-              Growth Tracking
-            </div>
-
-            <div class="principle">
-              Platform Health
-            </div>
-          </div>
-
-          <div class="screenshots">
-            <img src="@/assets/images/app_home.png" class="shot shot-1" />
-
-            <img src="@/assets/images/folder_screen.png" class="shot shot-2" />
-
-            <img src="@/assets/images/insight_Screen.png" class="shot shot-3" />
           </div>
         </div>
       </v-col>
@@ -102,7 +154,9 @@
       <v-col cols="12" md="5" class="login-section">
         <v-card class="login-card" elevation="0">
           <div class="login-brand">
-            <img src="@/assets/images/logo.png" class="login-logo" />
+            <div class="brand-mark">
+              <img src="@/assets/images/logo.png" />
+            </div>
 
             <div>
               <div class="login-brand-name">
@@ -116,67 +170,182 @@
           </div>
 
           <div class="mb-8">
-            <h2 class="text-h3 font-weight-bold">
-              Welcome Back
+            <h2 class="text-h4 font-weight-bold">
+              Welcome back
             </h2>
 
-            <p class="text-medium-emphasis mt-2">
-              Sign in to continue
+            <p class="login-subtitle mt-2">
+              Sign in to access your dashboard
             </p>
           </div>
 
-          <v-alert v-if="errorMessage" type="error" variant="tonal" class="mb-4">
+          <v-alert v-if="errorMessage" type="error" variant="tonal" density="compact" class="mb-4">
             {{ errorMessage }}
           </v-alert>
 
-          <v-text-field v-model="email" label="Email" variant="outlined" prepend-inner-icon="mdi-email-outline"
-            @keyup.enter="handleLogin" />
+          <v-text-field
+            v-model="email"
+            label="Email"
+            prepend-inner-icon="mdi-email-outline"
+            autocomplete="username"
+            class="mb-1"
+            @keyup.enter="handleLogin"
+          />
 
-          <v-text-field v-model="password" label="Password" type="password" variant="outlined"
-            prepend-inner-icon="mdi-lock-outline" @keyup.enter="handleLogin" />
+          <v-text-field
+            v-model="password"
+            label="Password"
+            :type="showPassword ? 'text' : 'password'"
+            prepend-inner-icon="mdi-lock-outline"
+            :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+            autocomplete="current-password"
+            @click:append-inner="showPassword = !showPassword"
+            @keyup.enter="handleLogin"
+          />
 
-          <v-btn block color="primary" size="large" class="mt-4" :loading="isLoading" @click="handleLogin">
+          <v-btn block color="primary" size="large" class="mt-2" :loading="isLoading" @click="handleLogin">
             Sign In
+            <v-icon end icon="mdi-arrow-right" />
           </v-btn>
+
+          <div class="login-footer">
+            <v-icon icon="mdi-shield-check-outline" size="14" class="mr-1" />
+            Secure access for the LinkBox team
+          </div>
         </v-card>
       </v-col>
     </v-row>
   </v-container>
 </template>
+
 <style scoped>
   .login-page {
+    position: relative;
     height: 100vh;
     overflow: hidden;
-    background: #f8fafc;
+    background: rgb(var(--v-theme-background));
   }
 
-  .showcase-section {
+  .theme-toggle {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 10;
+  }
+
+  .hero-section {
+    position: relative;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
-    background: linear-gradient(180deg,
-        #f8fafc 0%,
-        #F2FFFE 100%);
+    overflow: hidden;
+    padding: 64px;
+    background:
+      linear-gradient(135deg, rgba(4, 20, 30, 0.45) 0%, rgba(10, 15, 50, 0.55) 100%),
+      linear-gradient(135deg,
+        rgb(var(--v-theme-primary)) 0%,
+        rgb(var(--v-theme-secondary)) 100%);
   }
 
-  .showcase-content {
+  .hero-glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(100px);
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  .hero-glow-1 {
+    width: 380px;
+    height: 380px;
+
+    top: -120px;
+    right: -100px;
+
+    background: rgb(var(--v-theme-brand-purple));
+  }
+
+  .hero-glow-2 {
+    width: 340px;
+    height: 340px;
+
+    bottom: -140px;
+    left: -80px;
+
+    background: rgb(var(--v-theme-warning));
+    opacity: 0.3;
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 1;
+
     width: 100%;
-    height: 100%;
-    max-width: 650px;
+    max-width: 520px;
+
+    color: #FFFFFF;
   }
 
-  .brand-tag {
+  .hero-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+
+    margin-bottom: 40px;
+  }
+
+  .brand-mark {
+    flex-shrink: 0;
+
+    width: 48px;
+    height: 48px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 14px;
+    overflow: hidden;
+
+    background: #FFFFFF;
+  }
+
+  .brand-mark--lg {
+    width: 52px;
+    height: 52px;
+  }
+
+  .brand-mark img {
+    width: 160%;
+    height: 160%;
+    object-fit: contain;
+  }
+
+  .hero-brand-name {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .hero-brand-subtitle {
+    font-size: 12px;
+    font-weight: 600;
+
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .hero-tag {
     display: inline-flex;
 
-    padding: 8px 16px;
+    padding: 6px 14px;
 
     border-radius: 999px;
 
-    background: #E6F4F4;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.24);
 
-    color: #0DADA8;
+    color: #FFFFFF;
 
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
 
     text-transform: uppercase;
@@ -185,86 +354,62 @@
     margin-bottom: 20px;
   }
 
-  .showcase-content h1 {
-    font-size: 3rem;
-    line-height: 1.05;
+  .hero-content h1 {
+    font-size: 2.75rem;
+    line-height: 1.15;
     font-weight: 800;
-
-    color: #0f172a;
 
     margin-bottom: 16px;
   }
 
-  .showcase-content p {
-    font-size: 1.05rem;
+  .hero-content p {
+    font-size: 1rem;
     line-height: 1.7;
 
-    color: #64748b;
+    max-width: 440px;
 
-    margin-bottom: 24px;
+    color: rgba(255, 255, 255, 0.85);
+
+    margin-bottom: 36px;
   }
 
-  .founder-principles {
+  .hero-features {
     display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-
-    margin-bottom: 24px;
+    flex-direction: column;
+    gap: 14px;
   }
 
-  .principle {
-    padding: 10px 16px;
+  .hero-feature {
+    display: flex;
+    align-items: center;
+    gap: 14px;
 
-    background: white;
+    padding: 14px 16px;
 
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
+    border-radius: 16px;
 
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+
+    backdrop-filter: blur(6px);
+  }
+
+  .hero-feature-icon {
+    flex-shrink: 0;
+    box-shadow: none;
+  }
+
+  .hero-feature-title {
     font-size: 14px;
-    font-weight: 600;
-
-    color: #475569;
+    font-weight: 700;
   }
 
-  .screenshots {
-    position: relative;
-    height: 320px;
-  }
+  .hero-feature-desc {
+    font-size: 12px;
 
-  .shot {
-    position: absolute;
+    color: rgba(255, 255, 255, 0.75);
 
-    border-radius: 24px;
-
-    box-shadow:
-      0 20px 50px rgba(15, 23, 42, 0.12);
-  }
-
-  .shot-1 {
-    width: 170px;
-
-    left: 0;
-    top: 60px;
-
-    transform: rotate(-5deg);
-  }
-
-  .shot-2 {
-    width: 210px;
-
-    left: 120px;
-    top: 0;
-
-    z-index: 2;
-  }
-
-  .shot-3 {
-    width: 170px;
-
-    left: 280px;
-    top: 60px;
-
-    transform: rotate(5deg);
+    margin-top: 2px;
   }
 
   .login-section {
@@ -272,24 +417,23 @@
     align-items: center;
     justify-content: center;
 
-    background: white;
+    background: rgb(var(--v-theme-background));
     padding: 40px;
   }
 
   .login-card {
     width: 100%;
-    max-width: 460px;
+    max-width: 440px;
 
     padding: 40px;
 
-    border-radius: 28px;
+    border-radius: 24px;
 
-    background: white;
+    background: rgb(var(--v-theme-surface-bright));
 
-    border: 1px solid #e2e8f0;
+    border: 1px solid rgb(var(--v-theme-outline));
 
-    box-shadow:
-      0 25px 70px rgba(15, 23, 42, 0.08);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
   }
 
   .login-brand {
@@ -297,33 +441,58 @@
     align-items: center;
     gap: 16px;
 
-    margin-bottom: 40px;
-  }
-
-  .login-logo {
-    height: 64px;
+    margin-bottom: 32px;
   }
 
   .login-brand-name {
-    font-size: 28px;
+    font-size: 22px;
     font-weight: 800;
 
-    color: #0f172a;
+    color: rgb(var(--v-theme-on-surface));
   }
 
   .login-brand-subtitle {
-    color: #64748b;
-
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
+
+    color: rgb(var(--v-theme-text-tertiary));
   }
 
   .login-card h2 {
-    color: #0f172a;
+    color: rgb(var(--v-theme-on-surface));
+  }
+
+  .login-subtitle {
+    font-size: 14px;
+    color: rgb(var(--v-theme-text-tertiary));
+  }
+
+  .login-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+
+    margin-top: 28px;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    color: rgb(var(--v-theme-text-tertiary));
+  }
+
+  @media (max-width: 1280px) {
+    .hero-section {
+      padding: 40px;
+    }
+
+    .hero-content h1 {
+      font-size: 2.25rem;
+    }
   }
 
   @media (max-width: 960px) {
-    .showcase-section {
+    .hero-section {
       display: none;
     }
 
