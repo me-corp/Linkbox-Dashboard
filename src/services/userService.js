@@ -1,9 +1,12 @@
 import {
   writeBatch,
   collection,
+  documentId,
   getDocs,
   doc,
+  query,
   updateDoc,
+  where,
 } from 'firebase/firestore'
 
 import { db } from '@/firebase/config'
@@ -20,6 +23,35 @@ export async function getUsers() {
     id: doc.id,
     ...doc.data(),
   }))
+}
+
+/**
+ * Batch-fetches users by document id (chunks of 10 — Firestore `in` query
+ * limit). Returns a `{ [userId]: user }` map, omitting ids that don't exist.
+ */
+export async function getUsersByIds(ids) {
+  const uniqueIds = [...new Set(ids)].filter(Boolean)
+  if (!uniqueIds.length) return {}
+
+  const chunks = []
+  for (let i = 0; i < uniqueIds.length; i += 10) {
+    chunks.push(uniqueIds.slice(i, i + 10))
+  }
+
+  const snapshots = await Promise.all(
+    chunks.map(chunk =>
+      getDocs(query(collection(db, 'users'), where(documentId(), 'in', chunk)))
+    )
+  )
+
+  const usersById = {}
+  snapshots.forEach(snapshot => {
+    snapshot.forEach(docSnap => {
+      usersById[docSnap.id] = { id: docSnap.id, ...docSnap.data() }
+    })
+  })
+
+  return usersById
 }
 
 export async function updateUserWithAudit(

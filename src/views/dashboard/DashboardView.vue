@@ -1,120 +1,211 @@
 <script setup>
-  import { onMounted } from 'vue'
+import { onMounted } from 'vue'
 
-  import { useDashboardStore }
-    from '@/stores/dashboardStore'
+import { useDashboardStore } from '@/stores/dashboardStore'
+import { useGrowthStore } from '@/stores/growthStore'
 
-  import {useUsersStore} from '@/stores/usersStore'
+import StatsCard from '@/components/common/StatsCard.vue'
+import InsightsHeader from '@/components/common/InsightsHeader.vue'
+import UserGrowthChart from '@/components/charts/UserGrowthChart.vue'
 
-  import StatsCard
-    from '@/components/common/StatsCard.vue'
+const dashboardStore = useDashboardStore()
+const growthStore = useGrowthStore()
 
-  const dashboardStore =
-    useDashboardStore()
-  
-  const usersStore =
-    useUsersStore()
+onMounted(() => {
+  dashboardStore.loadOverview()
+})
 
-  onMounted(() => {
-    Promise.all([
-      dashboardStore.loadOverview(),
-      usersStore.loadUsers(),
-    ])
-  })
+function handleRefresh() {
+  dashboardStore.refresh()
+}
 </script>
 
 <template>
   <div>
-    <h1 class="mb-4">
-      Overview
-    </h1>
-    <v-divider class="my-4" />
-    <h2 class="mb-4">
-      Users
-    </h2>
+    <InsightsHeader
+      subtitle="A snapshot of LinkBox's growth, engagement, and platform health."
+      :loading="dashboardStore.loading"
+      :last-updated="dashboardStore.lastUpdated"
+      @refresh="handleRefresh"
+    />
+
+    <div class="section-title">
+      Users &amp; Content
+    </div>
     <v-row>
-      <v-col cols="12" md="3">
-        <StatsCard title="Total Users" :value="dashboardStore.totalUsers" icon="mdi-account-group" />
+      <v-col cols="12" sm="6" md="3">
+        <StatsCard
+          title="Total Users"
+          :value="dashboardStore.totalUsers.toLocaleString()"
+          icon="mdi-account-group"
+          color="primary"
+          :trend="dashboardStore.userGrowthPct"
+          trend-label="vs last week"
+          :loading="dashboardStore.loading"
+        />
       </v-col>
 
-      <v-col cols="12" md="3">
-        <StatsCard title="Guest Users" :value="dashboardStore.guestUsers" icon="mdi-account-clock" />
+      <v-col cols="12" sm="6" md="3">
+        <StatsCard
+          title="Pro Users"
+          :value="dashboardStore.proUsers.toLocaleString()"
+          icon="mdi-crown-outline"
+          color="brand-orange"
+          :subtitle="`${dashboardStore.proConversionPct}% of users`"
+          :loading="dashboardStore.loading"
+        />
       </v-col>
 
-      <v-col cols="12" md="3">
-        <StatsCard title="Registered Users" :value="dashboardStore.registeredUsers" icon="mdi-account-check" />
+      <v-col cols="12" sm="6" md="3">
+        <StatsCard
+          title="Total Folders"
+          :value="dashboardStore.totalFolders.toLocaleString()"
+          icon="mdi-folder-outline"
+          color="brand-blue"
+          :loading="dashboardStore.loading"
+        />
       </v-col>
 
-
-      <v-col cols="12" md="3">
-        <StatsCard title="Pro Users" :value="usersStore.dashboardMetrics.proUsers
-          " icon="mdi-account-heart" />
+      <v-col cols="12" sm="6" md="3">
+        <StatsCard
+          title="Total Links"
+          :value="dashboardStore.totalLinks.toLocaleString()"
+          icon="mdi-link-variant"
+          color="brand-purple"
+          :loading="dashboardStore.loading"
+        />
       </v-col>
     </v-row>
-    <v-divider class="my-4" />
-    <h2 class="mb-4">
-      Content
-    </h2>
+
+    <div class="section-title mt-6">
+      Activity
+    </div>
     <v-row>
-      <v-col cols="12" md="3">
-        <StatsCard title="Total Folders" :value="dashboardStore.totalFolders" icon="mdi-folder" />
+      <v-col cols="12" sm="6" md="3">
+        <StatsCard
+          title="Daily Active Users"
+          :value="dashboardStore.dau.toLocaleString()"
+          icon="mdi-account-clock-outline"
+          color="primary"
+          subtitle="Active today"
+          :loading="dashboardStore.loading"
+        />
       </v-col>
 
-      <v-col cols="12" md="3">
-        <StatsCard title="Total Links" :value="dashboardStore.totalLinks" icon="mdi-link" />
+      <v-col cols="12" sm="6" md="3">
+        <StatsCard
+          title="Weekly Active Users"
+          :value="dashboardStore.wau.toLocaleString()"
+          icon="mdi-calendar-week"
+          color="brand-blue"
+          subtitle="Last 7 days"
+          :loading="dashboardStore.loading"
+        />
       </v-col>
 
-      <v-col cols="12" md="3">
-        <StatsCard title="Folder Audience" :value="dashboardStore.folderAudienceCount" icon="mdi-account-group" />
+      <v-col cols="12" sm="6" md="3">
+        <StatsCard
+          title="Monthly Active Users"
+          :value="dashboardStore.mau.toLocaleString()"
+          icon="mdi-calendar-month"
+          color="brand-purple"
+          subtitle="Last 30 days"
+          :loading="dashboardStore.loading"
+        />
       </v-col>
 
-      <v-col cols="12" md="3">
-        <StatsCard title="Folder Insights" :value="dashboardStore.folderInsightsCount" icon="mdi-chart-bar" />
-      </v-col>
-
-      <v-col cols="12" md="3">
-        <StatsCard title="Link Insights" :value="dashboardStore.linkInsightsCount" icon="mdi-link-variant" />
-      </v-col>
-
-      <v-col cols="12" md="3">
-        <StatsCard title="Device Info" :value="dashboardStore.deviceInfoCount" icon="mdi-tablet" />
-      </v-col>
-
-      <v-col cols="12" md="3">
-        <StatsCard title="Notifications" :value="dashboardStore.notificationsCount" icon="mdi-bell" />
+      <v-col cols="12" sm="6" md="3">
+        <StatsCard
+          title="Stickiness"
+          :value="`${dashboardStore.stickiness}%`"
+          icon="mdi-magnet"
+          color="success"
+          subtitle="DAU / MAU"
+          :loading="dashboardStore.loading"
+        />
       </v-col>
     </v-row>
-    <v-divider class="my-4" />
-    <h2 class="mb-4">
-      User Activity
-    </h2>
+
+    <div class="section-title mt-6">
+      Growth
+    </div>
     <v-row>
-      <v-col cols="12" md="4">
-        <StatsCard title="DAU (Daily Active Users)" :value="usersStore.dashboardMetrics.activeUsersToday
-          " icon="mdi-account-heart" />
-      </v-col>
+      <v-col cols="12">
+        <v-card>
+          <v-card-text>
+            <div class="d-flex flex-wrap align-center justify-space-between mb-2 ga-2">
+              <div>
+                <div class="text-subtitle-1 font-weight-bold">
+                  User Growth (last 8 weeks)
+                </div>
+                <div class="text-caption text-medium-emphasis">
+                  +{{ dashboardStore.newUsersThisWeek }} new users this week
+                  ({{ dashboardStore.newUsersLastWeek }} last week)
+                </div>
+              </div>
 
-      <v-col cols="12" md="4">
-        <StatsCard title="WAU (Weekly Active Users  )" :value="usersStore.dashboardMetrics.active7Days
-          " icon="mdi-account-heart" />
-      </v-col>
+              <v-btn variant="text" color="primary" to="/growth" append-icon="mdi-arrow-right" size="small">
+                View Growth
+              </v-btn>
+            </div>
 
-      <v-col cols="12" md="4">
-        <StatsCard title="MAU (Monthly Active Users)" :value="usersStore.dashboardMetrics.active30Days
-          " icon="mdi-account-heart" />
+            <v-skeleton-loader v-if="dashboardStore.loading" type="image" height="120" />
+
+            <UserGrowthChart
+              v-else
+              :categories="growthStore.userGrowthSeries.labels"
+              :series="[{ name: 'Total Users', data: growthStore.userGrowthSeries.cumulative }]"
+              compact
+              :height="120"
+            />
+          </v-card-text>
+        </v-card>
       </v-col>
     </v-row>
-    <v-divider class="my-4" />
-    <h2 class="mb-4">
-      Operations
-    </h2>
+
+    <div class="section-title mt-6">
+      Platform Health
+    </div>
     <v-row>
-      <v-col cols="12" md="6">
-        <StatsCard title="Data Issues" :value="usersStore.dataIssuesCount
-          " icon="mdi-alert-circle" />
+      <v-col cols="12" sm="6" md="3">
+        <StatsCard
+          title="Folder Views"
+          :value="dashboardStore.folderInsightsCount.toLocaleString()"
+          icon="mdi-eye-outline"
+          color="brand-blue"
+          :loading="dashboardStore.loading"
+        />
       </v-col>
 
+      <v-col cols="12" sm="6" md="3">
+        <StatsCard
+          title="Link Clicks"
+          :value="dashboardStore.linkInsightsCount.toLocaleString()"
+          icon="mdi-cursor-default-click-outline"
+          color="primary"
+          :loading="dashboardStore.loading"
+        />
+      </v-col>
+
+      <v-col cols="12" sm="6" md="3">
+        <StatsCard
+          title="Shared Folders"
+          :value="dashboardStore.folderAudienceCount.toLocaleString()"
+          icon="mdi-account-multiple-outline"
+          color="brand-purple"
+          :loading="dashboardStore.loading"
+        />
+      </v-col>
+
+      <v-col cols="12" sm="6" md="3">
+        <StatsCard
+          title="Notifications Sent"
+          :value="dashboardStore.notificationsCount.toLocaleString()"
+          icon="mdi-bell-outline"
+          color="brand-orange"
+          :loading="dashboardStore.loading"
+        />
+      </v-col>
     </v-row>
-    <v-divider class="my-4" />
   </div>
 </template>

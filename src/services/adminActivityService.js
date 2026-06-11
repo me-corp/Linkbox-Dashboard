@@ -1,6 +1,10 @@
 import {
   addDoc,
   collection,
+  getDocs,
+  limit,
+  orderBy,
+  query,
   serverTimestamp,
 } from 'firebase/firestore'
 
@@ -20,4 +24,15 @@ export async function logAdminAction(
         serverTimestamp(),
     }
   )
+}
+
+/**
+ * Most recent admin activity log entries, newest first.
+ */
+export async function getRecentAdminActivity(limitN = 50) {
+  const snapshot = await getDocs(
+    query(collection(db, 'admin_activity_logs'), orderBy('createdAt', 'desc'), limit(limitN))
+  )
+
+  return snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
 }

@@ -154,7 +154,7 @@ function truncateUrl(url, maxLength = 60) {
                         <v-col cols="12" sm="6" md="3">
                             <v-card variant="outlined" class="text-center pa-4">
                                 <div class="text-caption text-grey mb-2">Today</div>
-                                <div class="text-h5 font-weight-bold text-blue">
+                                <div class="text-h5 font-weight-bold text-primary">
                                     {{ linkStats.dateStats.today }}
                                 </div>
                             </v-card>
@@ -162,7 +162,7 @@ function truncateUrl(url, maxLength = 60) {
                         <v-col cols="12" sm="6" md="3">
                             <v-card variant="outlined" class="text-center pa-4">
                                 <div class="text-caption text-grey mb-2">This Week</div>
-                                <div class="text-h5 font-weight-bold text-green">
+                                <div class="text-h5 font-weight-bold text-success">
                                     {{ linkStats.dateStats.thisWeek }}
                                 </div>
                             </v-card>
@@ -170,7 +170,7 @@ function truncateUrl(url, maxLength = 60) {
                         <v-col cols="12" sm="6" md="3">
                             <v-card variant="outlined" class="text-center pa-4">
                                 <div class="text-caption text-grey mb-2">This Month</div>
-                                <div class="text-h5 font-weight-bold text-orange">
+                                <div class="text-h5 font-weight-bold text-brand-orange">
                                     {{ linkStats.dateStats.thisMonth }}
                                 </div>
                             </v-card>
@@ -259,7 +259,7 @@ function truncateUrl(url, maxLength = 60) {
                                             :height="56"
                                             cover
                                             rounded="sm"
-                                            class="bg-grey-lighten-3"
+                                            class="bg-surface-light"
                                         >
                                             <template v-slot:error>
                                                 <div class="d-flex align-center justify-center h-100">
@@ -352,12 +352,11 @@ function truncateUrl(url, maxLength = 60) {
 
             <!-- Privacy Notice Footer -->
             <v-divider />
-            <v-card-text class="pa-3 bg-blue-lighten-5">
-                <div class="text-caption text-grey-darken-1">
-                    <v-icon size="x-small" class="mr-1">mdi-shield-check-outline</v-icon>
+            <v-card-text class="pa-3">
+                <v-alert type="info" variant="tonal" density="comfortable" icon="mdi-shield-check-outline">
                     <strong>Privacy Notice:</strong> This view displays aggregated link statistics and
                     metadata only. Individual link content and sensitive user data are protected.
-                </div>
+                </v-alert>
             </v-card-text>
         </v-card>
     </v-dialog>
@@ -365,16 +364,17 @@ function truncateUrl(url, maxLength = 60) {
 
 <style scoped>
 .border-bottom {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
 .border-left {
     border-left-width: 2px;
     border-left-style: solid;
+    border-left-color: rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
 .bordered {
-    border: 1px solid rgba(0, 0, 0, 0.12);
+    border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
     border-radius: 4px;
 }
 

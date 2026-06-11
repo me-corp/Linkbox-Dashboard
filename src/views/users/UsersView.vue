@@ -70,7 +70,7 @@
             return usersStore.users
                 .filter(user => {
                     const searchText =
-                        search.value.toLowerCase()
+                        (search.value || '').toLowerCase()
 
                     const matchesSearch =
                         !search.value ||

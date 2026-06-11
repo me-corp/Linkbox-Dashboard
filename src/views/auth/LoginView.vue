@@ -156,7 +156,7 @@
     justify-content: center;
     background: linear-gradient(180deg,
         #f8fafc 0%,
-        #eef2ff 100%);
+        #F2FFFE 100%);
   }
 
   .showcase-content {
@@ -172,9 +172,9 @@
 
     border-radius: 999px;
 
-    background: #eef2ff;
+    background: #E6F4F4;
 
-    color: #4f46e5;
+    color: #0DADA8;
 
     font-size: 13px;
     font-weight: 700;
