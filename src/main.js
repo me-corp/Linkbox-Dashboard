@@ -16,7 +16,6 @@ const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
-app.use(router)
 app.use(vuetify)
 app.use(VueApexCharts)
 
@@ -34,5 +33,9 @@ new Promise((resolve) => {
     }
   })
 }).then(() => {
+  // router performs its initial navigation as soon as it's installed,
+  // so it must run after auth state is known or the route guard redirects
+  // to /login before the persisted session is restored
+  app.use(router)
   app.mount('#app')
 })

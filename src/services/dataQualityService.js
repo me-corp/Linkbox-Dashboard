@@ -153,11 +153,18 @@ export function getSuggestedFix(user) {
   return updates
 }
 
-// folders & links should always carry these as explicit booleans
+// folders should always carry these as explicit booleans
 const VISIBILITY_FLAGS = [
   'isFavourite',
   'isHidden',
   'isPublic',
+]
+
+// links use PascalCase status flags (set by the fix-field-casing /
+// add-status-fields migrations) - links have no isFavourite or isPublic field
+const LINK_STATUS_FLAGS = [
+  'IsDeleted',
+  'IsHidden',
 ]
 
 function isMissingFlag(value) {
@@ -219,7 +226,7 @@ export function getLinkIssues(link) {
     })
   }
 
-  VISIBILITY_FLAGS.forEach(field => {
+  LINK_STATUS_FLAGS.forEach(field => {
     if (isMissingFlag(link[field])) {
       issues.push({
         key: `missing_${field}`,
@@ -238,7 +245,7 @@ export function getLinkSuggestedFix(link) {
     updates.id = link.id
   }
 
-  VISIBILITY_FLAGS.forEach(field => {
+  LINK_STATUS_FLAGS.forEach(field => {
     if (isMissingFlag(link[field])) {
       updates[field] = false
     }

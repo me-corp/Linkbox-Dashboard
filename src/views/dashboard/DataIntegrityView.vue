@@ -451,6 +451,48 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
         { title: 'Actions', key: 'actions', sortable: false },
     ]
 
+    // -- link issue filters --
+
+    const activeLinkFilters = ref([])
+
+    const linkIssueFilterOptions = computed(() => {
+        const counts = new Map()
+
+        linksWithIssues.value.forEach(item => {
+            item.issues.forEach(issue => {
+                const existing = counts.get(issue.key)
+
+                if (existing) {
+                    existing.count++
+                } else {
+                    counts.set(issue.key, { key: issue.key, label: issue.label, count: 1 })
+                }
+            })
+        })
+
+        return Array.from(counts.values())
+    })
+
+    const filteredLinksWithIssues = computed(() => {
+        if (!activeLinkFilters.value.length) {
+            return linksWithIssues.value
+        }
+
+        return linksWithIssues.value.filter(item =>
+            item.issues.some(issue => activeLinkFilters.value.includes(issue.key))
+        )
+    })
+
+    function toggleLinkFilter(key) {
+        const index = activeLinkFilters.value.indexOf(key)
+
+        if (index === -1) {
+            activeLinkFilters.value.push(key)
+        } else {
+            activeLinkFilters.value.splice(index, 1)
+        }
+    }
+
     function buildChanges(current, updates) {
         const changes = {}
 
@@ -981,6 +1023,30 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
                 links have data issues
             </v-alert>
 
+            <div v-if="linkIssueFilterOptions.length" class="d-flex flex-wrap align-center ga-2 mb-4">
+                <span class="text-caption text-medium-emphasis mr-1">Filter by issue:</span>
+
+                <v-chip
+                    v-for="option in linkIssueFilterOptions"
+                    :key="option.key"
+                    size="small"
+                    :color="activeLinkFilters.includes(option.key) ? 'primary' : undefined"
+                    :variant="activeLinkFilters.includes(option.key) ? 'flat' : 'outlined'"
+                    @click="toggleLinkFilter(option.key)"
+                >
+                    {{ option.label }} ({{ option.count }})
+                </v-chip>
+
+                <v-chip
+                    v-if="activeLinkFilters.length"
+                    size="small"
+                    variant="text"
+                    @click="activeLinkFilters = []"
+                >
+                    Clear filters
+                </v-chip>
+            </div>
+
             <v-card v-if="selectedLinksWithFix.length" class="mb-4">
                 <v-card-text class="d-flex align-center ga-4">
                     <strong>
@@ -1001,7 +1067,7 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
             <v-data-table
                 v-model="selectedLinkItems"
                 :headers="linkHeaders"
-                :items="linksWithIssues"
+                :items="filteredLinksWithIssues"
                 :item-value="item => item.link.id"
                 show-select
                 return-object
