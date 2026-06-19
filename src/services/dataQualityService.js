@@ -167,6 +167,14 @@ const LINK_STATUS_FLAGS = [
   'IsHidden',
 ]
 
+// folders_audience documents must have these as explicit booleans so the
+// mobile app's .where("isDeleted","==",false) / .where("isHidden","==",false)
+// queries can include the document
+const FOLDER_AUDIENCE_FLAGS = [
+  'isDeleted',
+  'isHidden',
+]
+
 function isMissingFlag(value) {
   return value !== true && value !== false
 }
@@ -247,6 +255,33 @@ export function getLinkSuggestedFix(link) {
 
   LINK_STATUS_FLAGS.forEach(field => {
     if (isMissingFlag(link[field])) {
+      updates[field] = false
+    }
+  })
+
+  return updates
+}
+
+export function getFolderAudienceIssues(audienceDoc) {
+  const issues = []
+
+  FOLDER_AUDIENCE_FLAGS.forEach(field => {
+    if (isMissingFlag(audienceDoc[field])) {
+      issues.push({
+        key: `missing_${field}`,
+        label: `Missing ${field}`,
+      })
+    }
+  })
+
+  return issues
+}
+
+export function getFolderAudienceSuggestedFix(audienceDoc) {
+  const updates = {}
+
+  FOLDER_AUDIENCE_FLAGS.forEach(field => {
+    if (isMissingFlag(audienceDoc[field])) {
       updates[field] = false
     }
   })

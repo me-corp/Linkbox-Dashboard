@@ -8,6 +8,7 @@ import StatsCard from '@/components/common/StatsCard.vue'
 import InsightsHeader from '@/components/common/InsightsHeader.vue'
 import UserGrowthChart from '@/components/charts/UserGrowthChart.vue'
 import LinkOpensChart from '@/components/charts/LinkOpensChart.vue'
+import InfoTooltip from '@/components/common/InfoTooltip.vue'
 
 const dashboardStore = useDashboardStore()
 const growthStore = useGrowthStore()
@@ -40,6 +41,7 @@ function handleRefresh() {
           icon="mdi-account-plus-outline"
           color="primary"
           :loading="dashboardStore.loading"
+          tooltip="Users whose createdAt falls within the current Mon–Sun calendar week."
         />
       </v-col>
 
@@ -50,6 +52,7 @@ function handleRefresh() {
           icon="mdi-account-arrow-left-outline"
           color="brand-blue"
           :loading="dashboardStore.loading"
+          tooltip="Users whose createdAt falls within the previous Mon–Sun calendar week."
         />
       </v-col>
 
@@ -61,6 +64,7 @@ function handleRefresh() {
           color="success"
           subtitle="New signups vs. last week"
           :loading="dashboardStore.loading"
+          tooltip="(This week signups − last week signups) ÷ last week signups × 100. Positive means accelerating growth."
         />
       </v-col>
 
@@ -72,6 +76,7 @@ function handleRefresh() {
           color="brand-orange"
           :subtitle="`${dashboardStore.proConversionPct}% of users`"
           :loading="dashboardStore.loading"
+          tooltip="Users with an active Pro subscription (isPro = true). The percentage is Pro ÷ Total Users."
         />
       </v-col>
     </v-row>
@@ -80,8 +85,9 @@ function handleRefresh() {
       <v-col cols="12" md="8">
         <v-card height="100%">
           <v-card-text>
-            <div class="text-subtitle-1 font-weight-bold mb-4">
+            <div class="text-subtitle-1 font-weight-bold mb-4 d-flex align-center">
               Total Users (Cumulative)
+              <InfoTooltip text="Running total of all registered users, plotted week by week. Each point is the total account count up to that week." />
             </div>
 
             <v-skeleton-loader v-if="growthStore.loading" type="image" height="280" />
@@ -100,8 +106,9 @@ function handleRefresh() {
       <v-col cols="12" md="4">
         <v-card height="100%">
           <v-card-text>
-            <div class="text-subtitle-1 font-weight-bold mb-4">
+            <div class="text-subtitle-1 font-weight-bold mb-4 d-flex align-center">
               Guest vs Registered
+              <InfoTooltip text="Guest accounts are created without a phone number. Registered accounts have verified a phone number. Calculated from the isGuest field on each user document." />
             </div>
 
             <v-skeleton-loader v-if="dashboardStore.loading" type="image" height="280" />
@@ -123,8 +130,9 @@ function handleRefresh() {
       <v-col cols="12" md="8">
         <v-card height="100%">
           <v-card-text>
-            <div class="text-subtitle-1 font-weight-bold mb-4">
+            <div class="text-subtitle-1 font-weight-bold mb-4 d-flex align-center">
               New Users per Week
+              <InfoTooltip text="New signups each week, counted by grouping createdAt timestamps into Mon–Sun buckets. Shows whether growth is accelerating or slowing." />
             </div>
 
             <v-skeleton-loader v-if="growthStore.loading" type="image" height="260" />
@@ -143,8 +151,9 @@ function handleRefresh() {
       <v-col cols="12" md="4">
         <v-card height="100%">
           <v-card-text>
-            <div class="text-subtitle-1 font-weight-bold mb-4">
+            <div class="text-subtitle-1 font-weight-bold mb-4 d-flex align-center">
               Platform Split
+              <InfoTooltip text="Breakdown of users by device platform (iOS, Android, etc.), derived from the platform field on user documents." />
             </div>
 
             <v-skeleton-loader v-if="growthStore.loading" type="image" height="260" />

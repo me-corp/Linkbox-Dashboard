@@ -172,3 +172,37 @@ export async function bulkUpdateLinks(updates) {
     await batch.commit()
   }
 }
+
+export async function getFoldersAudience() {
+  const snapshot = await getDocs(
+    collection(db, 'folders_audience')
+  )
+
+  return snapshot.docs.map(docSnap => {
+    const data = docSnap.data()
+
+    return {
+      ...data,
+      id: docSnap.id,
+    }
+  })
+}
+
+export async function updateFolderAudienceFields(docId, updates) {
+  await updateDoc(
+    doc(db, 'folders_audience', docId),
+    updates
+  )
+}
+
+export async function bulkUpdateFoldersAudience(updates) {
+  for (const batchItems of chunk(updates, 500)) {
+    const batch = writeBatch(db)
+
+    batchItems.forEach(({ id, fields }) => {
+      batch.update(doc(db, 'folders_audience', id), fields)
+    })
+
+    await batch.commit()
+  }
+}

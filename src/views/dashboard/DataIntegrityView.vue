@@ -23,6 +23,8 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
         getFolderSuggestedFix,
         getLinkIssues,
         getLinkSuggestedFix,
+        getFolderAudienceIssues,
+        getFolderAudienceSuggestedFix,
     } from '@/services/dataQualityService'
 
     import {
@@ -34,6 +36,9 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
         createFolderAudienceMapping,
         bulkUpdateFolders,
         bulkUpdateLinks,
+        getFoldersAudience,
+        updateFolderAudienceFields,
+        bulkUpdateFoldersAudience,
     } from '@/services/dataIntegrityService'
 
     import ConfirmUserUpdateDialog
@@ -378,38 +383,67 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
     )
 })
 
-    // ---- Folders & Links integrity ----
+    // ---- Folders integrity ----
 
     const folders = ref([])
-    const links = ref([])
     const audienceFolderIds = ref(new Set())
+    const foldersLoading = ref(false)
+    const foldersLoaded = ref(false)
 
-    const foldersLinksLoading = ref(false)
-    const foldersLinksLoaded = ref(false)
-
-    async function loadFoldersAndLinks() {
-        foldersLinksLoading.value = true
+    async function loadFolders() {
+        foldersLoading.value = true
 
         try {
-            const [
-                foldersData,
-                linksData,
-                audienceIds,
-            ] = await Promise.all([
+            const [foldersData, audienceIds] = await Promise.all([
                 getFolders(),
-                getLinks(),
                 getAudienceFolderIds(),
             ])
 
             folders.value = foldersData
-            links.value = linksData
             audienceFolderIds.value = audienceIds
-
-            foldersLinksLoaded.value = true
+            foldersLoaded.value = true
         } catch (error) {
             console.error(error)
         } finally {
-            foldersLinksLoading.value = false
+            foldersLoading.value = false
+        }
+    }
+
+    // ---- Links integrity ----
+
+    const links = ref([])
+    const linksLoading = ref(false)
+    const linksLoaded = ref(false)
+
+    async function loadLinks() {
+        linksLoading.value = true
+
+        try {
+            links.value = await getLinks()
+            linksLoaded.value = true
+        } catch (error) {
+            console.error(error)
+        } finally {
+            linksLoading.value = false
+        }
+    }
+
+    // ---- Folder Audience integrity ----
+
+    const foldersAudience = ref([])
+    const audienceLoading = ref(false)
+    const audienceLoaded = ref(false)
+
+    async function loadFoldersAudience() {
+        audienceLoading.value = true
+
+        try {
+            foldersAudience.value = await getFoldersAudience()
+            audienceLoaded.value = true
+        } catch (error) {
+            console.error(error)
+        } finally {
+            audienceLoading.value = false
         }
     }
 
@@ -743,6 +777,156 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
             updating.value = false
         }
     }
+
+    // -- folders_audience integrity --
+
+    const foldersAudienceWithIssues = computed(() =>
+        foldersAudience.value
+            .map(audienceDoc => ({
+                audienceDoc,
+                issues: getFolderAudienceIssues(audienceDoc),
+                suggestedFix: getFolderAudienceSuggestedFix(audienceDoc),
+            }))
+            .filter(item => item.issues.length > 0)
+    )
+
+    const audienceHeaders = [
+        { title: 'Document ID', key: 'audienceDoc.id' },
+        { title: 'Folder ID', key: 'audienceDoc.folderId' },
+        { title: 'User ID', key: 'audienceDoc.userId' },
+        { title: 'Issues', key: 'issues', sortable: false },
+        { title: 'Suggested Fix', key: 'suggestedFix', sortable: false },
+        { title: 'Actions', key: 'actions', sortable: false },
+    ]
+
+    const activeAudienceFilters = ref([])
+
+    const audienceIssueFilterOptions = computed(() => {
+        const counts = new Map()
+
+        foldersAudienceWithIssues.value.forEach(item => {
+            item.issues.forEach(issue => {
+                const existing = counts.get(issue.key)
+
+                if (existing) {
+                    existing.count++
+                } else {
+                    counts.set(issue.key, { key: issue.key, label: issue.label, count: 1 })
+                }
+            })
+        })
+
+        return Array.from(counts.values())
+    })
+
+    const filteredFoldersAudienceWithIssues = computed(() => {
+        if (!activeAudienceFilters.value.length) {
+            return foldersAudienceWithIssues.value
+        }
+
+        return foldersAudienceWithIssues.value.filter(item =>
+            item.issues.some(issue => activeAudienceFilters.value.includes(issue.key))
+        )
+    })
+
+    function toggleAudienceFilter(key) {
+        const index = activeAudienceFilters.value.indexOf(key)
+
+        if (index === -1) {
+            activeAudienceFilters.value.push(key)
+        } else {
+            activeAudienceFilters.value.splice(index, 1)
+        }
+    }
+
+    // -- single folders_audience fix --
+
+    const selectedAudienceItems = ref([])
+    const showAudienceFixDialog = ref(false)
+    const selectedAudienceItem = ref(null)
+    const pendingAudienceUpdates = ref(null)
+
+    function openAudienceFixDialog(item) {
+        selectedAudienceItem.value = item
+        pendingAudienceUpdates.value = item.suggestedFix
+        showAudienceFixDialog.value = true
+    }
+
+    async function confirmAudienceFix() {
+        const item = selectedAudienceItem.value
+        const updates = pendingAudienceUpdates.value
+
+        try {
+            updating.value = true
+
+            await updateFolderAudienceFields(item.audienceDoc.id, updates)
+
+            await logAdminAction({
+                action: 'apply_folder_audience_fix',
+                performedBy: { email: 'harsha@linkbox.store' },
+                audienceDocId: item.audienceDoc.id,
+                changes: buildChanges(item.audienceDoc, updates),
+            })
+
+            Object.assign(item.audienceDoc, updates)
+
+            showAudienceFixDialog.value = false
+            selectedAudienceItem.value = null
+            pendingAudienceUpdates.value = null
+        } catch (error) {
+            console.error(error)
+        } finally {
+            updating.value = false
+        }
+    }
+
+    // -- bulk folders_audience fix --
+
+    const showBulkAudienceDialog = ref(false)
+
+    const selectedAudienceWithFix = computed(() =>
+        selectedAudienceItems.value.filter(
+            item => Object.keys(item.suggestedFix).length > 0
+        )
+    )
+
+    const audienceFieldCounts = computed(() =>
+        countFields(selectedAudienceWithFix.value)
+    )
+
+    async function confirmBulkAudienceFix() {
+        const items = selectedAudienceWithFix.value
+
+        try {
+            updating.value = true
+
+            await bulkUpdateFoldersAudience(
+                items.map(item => ({
+                    id: item.audienceDoc.id,
+                    fields: item.suggestedFix,
+                }))
+            )
+
+            await logAdminAction({
+                action: 'bulk_apply_folder_audience_fixes',
+                performedBy: { email: 'harsha@linkbox.store' },
+                itemCount: items.length,
+                fieldCounts: countFields(items),
+                audienceDocIds: items.map(item => item.audienceDoc.id).slice(0, 200),
+            })
+
+            items.forEach(item => {
+                Object.assign(item.audienceDoc, item.suggestedFix)
+            })
+
+            selectedAudienceItems.value = []
+            showBulkAudienceDialog.value = false
+        } catch (error) {
+            console.error(error)
+        } finally {
+            updating.value = false
+        }
+    }
 </script>
 
 <template>
@@ -896,59 +1080,36 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
 </v-data-table>
     </div>
 
+    <!-- ---- Folders ---- -->
     <div class="mt-8">
-        <h1 class="mb-4">
-            Folders &amp; Links
-        </h1>
+        <h1 class="mb-4">Folders</h1>
 
         <v-card class="mb-4">
             <v-card-text class="d-flex align-center ga-4 flex-wrap">
                 <div>
-                    <div class="text-subtitle-1 font-weight-bold">
-                        Folder &amp; Link Integrity Check
-                    </div>
-
+                    <div class="text-subtitle-1 font-weight-bold">Folder Integrity Check</div>
                     <div class="text-caption text-medium-emphasis">
-                        Checks for folders missing a folders_audience mapping
-                        (unreachable from the app), and folders / links missing
-                        the isFavourite, isHidden or isPublic flags.
+                        Checks for folders missing a folders_audience mapping and folders
+                        missing the isFavourite, isHidden or isPublic flags.
                     </div>
                 </div>
-
                 <v-spacer />
-
-                <v-btn color="primary" :loading="foldersLinksLoading" @click="loadFoldersAndLinks">
-                    {{ foldersLinksLoaded ? 'Re-run Check' : 'Run Check' }}
+                <v-btn color="primary" :loading="foldersLoading" @click="loadFolders">
+                    {{ foldersLoaded ? 'Re-run Check' : 'Run Check' }}
                 </v-btn>
             </v-card-text>
         </v-card>
 
-        <template v-if="foldersLinksLoaded">
-            <h2 class="mb-4">
-                Folders
-            </h2>
-
+        <template v-if="foldersLoaded">
             <v-alert type="warning" variant="tonal" class="mb-4">
-                {{ foldersWithIssues.length }}
-                of
-                {{ folders.length }}
-                folders have data issues
+                {{ foldersWithIssues.length }} of {{ folders.length }} folders have data issues
             </v-alert>
 
             <v-card v-if="selectedFoldersWithFix.length" class="mb-4">
                 <v-card-text class="d-flex align-center ga-4">
-                    <strong>
-                        {{ selectedFoldersWithFix.length }}
-                        selected
-                    </strong>
-
-                    <v-btn color="primary" @click="showBulkFolderDialog = true">
-                        Apply Suggested Fixes
-                    </v-btn>
-
-                    <v-btn variant="text" @click="selectedFolderItems = []">
-                        Clear
-                    </v-btn>
+                    <strong>{{ selectedFoldersWithFix.length }} selected</strong>
+                    <v-btn color="primary" @click="showBulkFolderDialog = true">Apply Suggested Fixes</v-btn>
+                    <v-btn variant="text" @click="selectedFolderItems = []">Clear</v-btn>
                 </v-card-text>
             </v-card>
 
@@ -960,32 +1121,20 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
                 show-select
                 return-object
                 :items-per-page="25"
-                class="elevation-1 mb-8"
+                class="elevation-1"
             >
                 <template v-slot:[`item.issues`]="{ item }">
                     <div class="d-flex flex-wrap ga-1">
-                        <v-chip
-                            v-for="issue in item.issues"
-                            :key="issue.key"
-                            color="error"
-                            size="small"
-                        >
+                        <v-chip v-for="issue in item.issues" :key="issue.key" color="error" size="small">
                             {{ issue.label }}
                         </v-chip>
                     </div>
                 </template>
 
                 <template v-slot:[`item.suggestedFix`]="{ item }">
-                    <span v-if="!Object.keys(item.suggestedFix).length" class="text-medium-emphasis">
-                        —
-                    </span>
-
-                    <div
-                        v-for="(value, key) in item.suggestedFix"
-                        :key="key"
-                    >
-                        <strong>{{ key }}</strong>:
-                        {{ value }}
+                    <span v-if="!Object.keys(item.suggestedFix).length" class="text-medium-emphasis">—</span>
+                    <div v-for="(value, key) in item.suggestedFix" :key="key">
+                        <strong>{{ key }}</strong>: {{ value }}
                     </div>
                 </template>
 
@@ -999,7 +1148,6 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
                         >
                             Apply Suggested
                         </v-btn>
-
                         <v-btn
                             v-if="!audienceFolderIds.has(item.folder.id)"
                             color="warning"
@@ -1011,21 +1159,35 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
                     </div>
                 </template>
             </v-data-table>
+        </template>
+    </div>
 
-            <h2 class="mb-4">
-                Links
-            </h2>
+    <!-- ---- Links ---- -->
+    <div class="mt-8">
+        <h1 class="mb-4">Links</h1>
 
+        <v-card class="mb-4">
+            <v-card-text class="d-flex align-center ga-4 flex-wrap">
+                <div>
+                    <div class="text-subtitle-1 font-weight-bold">Link Integrity Check</div>
+                    <div class="text-caption text-medium-emphasis">
+                        Checks for links missing the IsDeleted or IsHidden flags.
+                    </div>
+                </div>
+                <v-spacer />
+                <v-btn color="primary" :loading="linksLoading" @click="loadLinks">
+                    {{ linksLoaded ? 'Re-run Check' : 'Run Check' }}
+                </v-btn>
+            </v-card-text>
+        </v-card>
+
+        <template v-if="linksLoaded">
             <v-alert type="warning" variant="tonal" class="mb-4">
-                {{ linksWithIssues.length }}
-                of
-                {{ links.length }}
-                links have data issues
+                {{ linksWithIssues.length }} of {{ links.length }} links have data issues
             </v-alert>
 
             <div v-if="linkIssueFilterOptions.length" class="d-flex flex-wrap align-center ga-2 mb-4">
                 <span class="text-caption text-medium-emphasis mr-1">Filter by issue:</span>
-
                 <v-chip
                     v-for="option in linkIssueFilterOptions"
                     :key="option.key"
@@ -1036,7 +1198,6 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
                 >
                     {{ option.label }} ({{ option.count }})
                 </v-chip>
-
                 <v-chip
                     v-if="activeLinkFilters.length"
                     size="small"
@@ -1049,18 +1210,9 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
 
             <v-card v-if="selectedLinksWithFix.length" class="mb-4">
                 <v-card-text class="d-flex align-center ga-4">
-                    <strong>
-                        {{ selectedLinksWithFix.length }}
-                        selected
-                    </strong>
-
-                    <v-btn color="primary" @click="showBulkLinkDialog = true">
-                        Apply Suggested Fixes
-                    </v-btn>
-
-                    <v-btn variant="text" @click="selectedLinkItems = []">
-                        Clear
-                    </v-btn>
+                    <strong>{{ selectedLinksWithFix.length }} selected</strong>
+                    <v-btn color="primary" @click="showBulkLinkDialog = true">Apply Suggested Fixes</v-btn>
+                    <v-btn variant="text" @click="selectedLinkItems = []">Clear</v-btn>
                 </v-card-text>
             </v-card>
 
@@ -1076,28 +1228,16 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
             >
                 <template v-slot:[`item.issues`]="{ item }">
                     <div class="d-flex flex-wrap ga-1">
-                        <v-chip
-                            v-for="issue in item.issues"
-                            :key="issue.key"
-                            color="error"
-                            size="small"
-                        >
+                        <v-chip v-for="issue in item.issues" :key="issue.key" color="error" size="small">
                             {{ issue.label }}
                         </v-chip>
                     </div>
                 </template>
 
                 <template v-slot:[`item.suggestedFix`]="{ item }">
-                    <span v-if="!Object.keys(item.suggestedFix).length" class="text-medium-emphasis">
-                        —
-                    </span>
-
-                    <div
-                        v-for="(value, key) in item.suggestedFix"
-                        :key="key"
-                    >
-                        <strong>{{ key }}</strong>:
-                        {{ value }}
+                    <span v-if="!Object.keys(item.suggestedFix).length" class="text-medium-emphasis">—</span>
+                    <div v-for="(value, key) in item.suggestedFix" :key="key">
+                        <strong>{{ key }}</strong>: {{ value }}
                     </div>
                 </template>
 
@@ -1107,6 +1247,101 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
                         color="primary"
                         size="small"
                         @click="openLinkFixDialog(item)"
+                    >
+                        Apply Suggested
+                    </v-btn>
+                </template>
+            </v-data-table>
+        </template>
+    </div>
+
+    <!-- ---- Folder Audience Mappings ---- -->
+    <div class="mt-8">
+        <h1 class="mb-4">Folder Audience Mappings</h1>
+
+        <v-card class="mb-4">
+            <v-card-text class="d-flex align-center ga-4 flex-wrap">
+                <div>
+                    <div class="text-subtitle-1 font-weight-bold">Folder Audience Integrity Check</div>
+                    <div class="text-caption text-medium-emphasis">
+                        Checks for folders_audience documents missing the isDeleted or isHidden flags,
+                        which would exclude them from app queries.
+                    </div>
+                </div>
+                <v-spacer />
+                <v-btn color="primary" :loading="audienceLoading" @click="loadFoldersAudience">
+                    {{ audienceLoaded ? 'Re-run Check' : 'Run Check' }}
+                </v-btn>
+            </v-card-text>
+        </v-card>
+
+        <template v-if="audienceLoaded">
+            <v-alert type="warning" variant="tonal" class="mb-4">
+                {{ foldersAudienceWithIssues.length }} of {{ foldersAudience.length }}
+                folders_audience documents have data issues
+            </v-alert>
+
+            <div v-if="audienceIssueFilterOptions.length" class="d-flex flex-wrap align-center ga-2 mb-4">
+                <span class="text-caption text-medium-emphasis mr-1">Filter by issue:</span>
+                <v-chip
+                    v-for="option in audienceIssueFilterOptions"
+                    :key="option.key"
+                    size="small"
+                    :color="activeAudienceFilters.includes(option.key) ? 'primary' : undefined"
+                    :variant="activeAudienceFilters.includes(option.key) ? 'flat' : 'outlined'"
+                    @click="toggleAudienceFilter(option.key)"
+                >
+                    {{ option.label }} ({{ option.count }})
+                </v-chip>
+                <v-chip
+                    v-if="activeAudienceFilters.length"
+                    size="small"
+                    variant="text"
+                    @click="activeAudienceFilters = []"
+                >
+                    Clear filters
+                </v-chip>
+            </div>
+
+            <v-card v-if="selectedAudienceWithFix.length" class="mb-4">
+                <v-card-text class="d-flex align-center ga-4">
+                    <strong>{{ selectedAudienceWithFix.length }} selected</strong>
+                    <v-btn color="primary" @click="showBulkAudienceDialog = true">Apply Suggested Fixes</v-btn>
+                    <v-btn variant="text" @click="selectedAudienceItems = []">Clear</v-btn>
+                </v-card-text>
+            </v-card>
+
+            <v-data-table
+                v-model="selectedAudienceItems"
+                :headers="audienceHeaders"
+                :items="filteredFoldersAudienceWithIssues"
+                :item-value="item => item.audienceDoc.id"
+                show-select
+                return-object
+                :items-per-page="25"
+                class="elevation-1"
+            >
+                <template v-slot:[`item.issues`]="{ item }">
+                    <div class="d-flex flex-wrap ga-1">
+                        <v-chip v-for="issue in item.issues" :key="issue.key" color="error" size="small">
+                            {{ issue.label }}
+                        </v-chip>
+                    </div>
+                </template>
+
+                <template v-slot:[`item.suggestedFix`]="{ item }">
+                    <span v-if="!Object.keys(item.suggestedFix).length" class="text-medium-emphasis">—</span>
+                    <div v-for="(value, key) in item.suggestedFix" :key="key">
+                        <strong>{{ key }}</strong>: {{ value }}
+                    </div>
+                </template>
+
+                <template v-slot:[`item.actions`]="{ item }">
+                    <v-btn
+                        v-if="Object.keys(item.suggestedFix).length"
+                        color="primary"
+                        size="small"
+                        @click="openAudienceFixDialog(item)"
                     >
                         Apply Suggested
                     </v-btn>
@@ -1169,5 +1404,26 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
         :field-counts="linkFieldCounts"
         :loading="updating"
         @confirm="confirmBulkLinkFix"
+    />
+
+    <ConfirmFixDialog
+        v-model="showAudienceFixDialog"
+        title="Confirm Folder Audience Update"
+        :item-label="selectedAudienceItem?.audienceDoc?.id"
+        :item-sub-label="selectedAudienceItem?.audienceDoc?.folderId"
+        :current="selectedAudienceItem?.audienceDoc"
+        :updates="pendingAudienceUpdates"
+        :loading="updating"
+        @confirm="confirmAudienceFix"
+    />
+
+    <ConfirmBulkFixDialog
+        v-model="showBulkAudienceDialog"
+        title="Bulk Apply Folder Audience Fixes"
+        item-label="folders_audience documents"
+        :count="selectedAudienceWithFix.length"
+        :field-counts="audienceFieldCounts"
+        :loading="updating"
+        @confirm="confirmBulkAudienceFix"
     />
 </template>

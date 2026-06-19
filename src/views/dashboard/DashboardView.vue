@@ -42,6 +42,7 @@ function handleRefresh() {
           :trend="dashboardStore.userGrowthPct"
           trend-label="vs last week"
           :loading="dashboardStore.loading"
+          tooltip="All user documents in Firestore — guests and registered accounts combined."
         />
       </v-col>
 
@@ -53,6 +54,7 @@ function handleRefresh() {
           color="brand-orange"
           :subtitle="`${dashboardStore.proConversionPct}% of users`"
           :loading="dashboardStore.loading"
+          tooltip="Users with an active Pro subscription (isPro = true). The percentage shown is Pro ÷ Total Users."
         />
       </v-col>
 
@@ -63,6 +65,7 @@ function handleRefresh() {
           icon="mdi-folder-outline"
           color="brand-blue"
           :loading="dashboardStore.loading"
+          tooltip="All folder documents ever created in Firestore, including deleted folders."
         />
       </v-col>
 
@@ -73,6 +76,7 @@ function handleRefresh() {
           icon="mdi-link-variant"
           color="brand-purple"
           :loading="dashboardStore.loading"
+          tooltip="All link documents ever saved in Firestore, including deleted links."
         />
       </v-col>
     </v-row>
@@ -89,6 +93,7 @@ function handleRefresh() {
           color="primary"
           subtitle="Active today"
           :loading="dashboardStore.loading"
+          tooltip="Users whose lastActivityAt timestamp falls within the last 24 hours."
         />
       </v-col>
 
@@ -100,6 +105,7 @@ function handleRefresh() {
           color="brand-blue"
           subtitle="Last 7 days"
           :loading="dashboardStore.loading"
+          tooltip="Users whose lastActivityAt timestamp falls within the last 7 days."
         />
       </v-col>
 
@@ -111,6 +117,7 @@ function handleRefresh() {
           color="brand-purple"
           subtitle="Last 30 days"
           :loading="dashboardStore.loading"
+          tooltip="Users whose lastActivityAt timestamp falls within the last 30 days."
         />
       </v-col>
 
@@ -122,6 +129,7 @@ function handleRefresh() {
           color="success"
           subtitle="DAU / MAU"
           :loading="dashboardStore.loading"
+          tooltip="DAU ÷ MAU × 100. How often monthly users return on any given day. Consumer apps typically aim for 20%+."
         />
       </v-col>
     </v-row>
@@ -174,6 +182,7 @@ function handleRefresh() {
           icon="mdi-eye-outline"
           color="brand-blue"
           :loading="dashboardStore.loading"
+          tooltip="Total folder_insights events recorded — each represents one folder being opened by a user."
         />
       </v-col>
 
@@ -184,6 +193,7 @@ function handleRefresh() {
           icon="mdi-cursor-default-click-outline"
           color="primary"
           :loading="dashboardStore.loading"
+          tooltip="Total link_insights click events recorded across all users and folders."
         />
       </v-col>
 
@@ -194,6 +204,7 @@ function handleRefresh() {
           icon="mdi-account-multiple-outline"
           color="brand-purple"
           :loading="dashboardStore.loading"
+          tooltip="Total folders_audience documents — each represents one user having access to one folder (owner or shared)."
         />
       </v-col>
 
@@ -204,6 +215,7 @@ function handleRefresh() {
           icon="mdi-bell-outline"
           color="brand-orange"
           :loading="dashboardStore.loading"
+          tooltip="Total notification documents ever created in Firestore — includes all push notifications sent to any user."
         />
       </v-col>
     </v-row>

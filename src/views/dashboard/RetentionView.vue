@@ -9,6 +9,7 @@ import InsightsHeader from '@/components/common/InsightsHeader.vue'
 import DAUChart from '@/components/charts/DAUChart.vue'
 import CohortRetentionChart from '@/components/charts/CohortRetentionChart.vue'
 import FolderVisitsChart from '@/components/charts/FolderVisitsChart.vue'
+import InfoTooltip from '@/components/common/InfoTooltip.vue'
 
 const dashboardStore = useDashboardStore()
 const retentionStore = useRetentionStore()
@@ -55,6 +56,7 @@ const cohortsAvailable = computed(() => retentionStore.cohorts.activeUsers.some(
           icon="mdi-account-clock-outline"
           color="primary"
           :loading="retentionStore.loading"
+          tooltip="Users whose lastActivityAt timestamp falls within the last 24 hours."
         />
       </v-col>
 
@@ -65,6 +67,7 @@ const cohortsAvailable = computed(() => retentionStore.cohorts.activeUsers.some(
           icon="mdi-calendar-week"
           color="brand-blue"
           :loading="retentionStore.loading"
+          tooltip="Users whose lastActivityAt timestamp falls within the last 7 days."
         />
       </v-col>
 
@@ -75,6 +78,7 @@ const cohortsAvailable = computed(() => retentionStore.cohorts.activeUsers.some(
           icon="mdi-calendar-month"
           color="brand-purple"
           :loading="retentionStore.loading"
+          tooltip="Users whose lastActivityAt timestamp falls within the last 30 days."
         />
       </v-col>
 
@@ -86,6 +90,7 @@ const cohortsAvailable = computed(() => retentionStore.cohorts.activeUsers.some(
           color="success"
           subtitle="DAU / MAU"
           :loading="retentionStore.loading"
+          tooltip="DAU ÷ MAU × 100. How often monthly users return on any given day. Consumer apps typically aim for 20%+."
         />
       </v-col>
     </v-row>
@@ -94,8 +99,9 @@ const cohortsAvailable = computed(() => retentionStore.cohorts.activeUsers.some(
       <v-col cols="12" md="6">
         <v-card height="100%">
           <v-card-text>
-            <div class="text-subtitle-1 font-weight-bold mb-4">
+            <div class="text-subtitle-1 font-weight-bold mb-4 d-flex align-center">
               Active Users Breakdown
+              <InfoTooltip text="Side-by-side comparison of DAU, WAU, and MAU. A healthy app shows MAU >> WAU >> DAU, with DAU/MAU (stickiness) above 20%." />
             </div>
 
             <v-skeleton-loader v-if="retentionStore.loading" type="image" height="260" />
@@ -113,8 +119,9 @@ const cohortsAvailable = computed(() => retentionStore.cohorts.activeUsers.some(
       <v-col cols="12" md="6">
         <v-card height="100%">
           <v-card-text>
-            <div class="text-subtitle-1 font-weight-bold mb-4">
+            <div class="text-subtitle-1 font-weight-bold mb-4 d-flex align-center">
               Dormant Users
+              <InfoTooltip text="Users who have not recorded any lastActivityAt update in 30, 60, or 90+ days. The bar shows each group as a percentage of total users." />
             </div>
 
             <v-skeleton-loader v-if="retentionStore.loading" type="list-item-three-line@3" />
@@ -144,8 +151,9 @@ const cohortsAvailable = computed(() => retentionStore.cohorts.activeUsers.some(
       <v-col cols="12">
         <v-card>
           <v-card-text>
-            <div class="text-subtitle-1 font-weight-bold mb-4">
+            <div class="text-subtitle-1 font-weight-bold mb-4 d-flex align-center">
               Weekly Signup Cohorts vs. Still Active (30d)
+              <InfoTooltip text="For each signup week, compares how many new users joined vs. how many are still active within the last 30 days. Requires a Firestore composite index on users: createdAt + lastActivityAt." />
             </div>
 
             <v-skeleton-loader v-if="retentionStore.loading" type="image" height="300" />

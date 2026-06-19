@@ -8,6 +8,7 @@ import StatsCard from '@/components/common/StatsCard.vue'
 import InsightsHeader from '@/components/common/InsightsHeader.vue'
 import LinkOpensChart from '@/components/charts/LinkOpensChart.vue'
 import FolderVisitsChart from '@/components/charts/FolderVisitsChart.vue'
+import InfoTooltip from '@/components/common/InfoTooltip.vue'
 
 const dashboardStore = useDashboardStore()
 const engagementStore = useEngagementStore()
@@ -38,6 +39,7 @@ function handleRefresh() {
           icon="mdi-link-variant"
           color="primary"
           :loading="engagementStore.loading"
+          tooltip="Total active link documents ÷ total user count. Measures how much content each user saves on average."
         />
       </v-col>
 
@@ -48,6 +50,7 @@ function handleRefresh() {
           icon="mdi-folder-outline"
           color="brand-blue"
           :loading="engagementStore.loading"
+          tooltip="Total active folder documents ÷ total user count. Measures how organised users are with their content."
         />
       </v-col>
 
@@ -58,6 +61,7 @@ function handleRefresh() {
           icon="mdi-eye-outline"
           color="brand-purple"
           :loading="engagementStore.loading"
+          tooltip="Sum of the visits field across all folder documents — the total number of times any folder has been opened."
         />
       </v-col>
 
@@ -68,6 +72,7 @@ function handleRefresh() {
           icon="mdi-chart-line"
           color="success"
           :loading="engagementStore.loading"
+          tooltip="Total Folder Visits ÷ total number of folders. Higher values mean folders are being revisited regularly."
         />
       </v-col>
     </v-row>
@@ -76,8 +81,9 @@ function handleRefresh() {
       <v-col cols="12" md="4">
         <v-card height="100%">
           <v-card-text>
-            <div class="text-subtitle-1 font-weight-bold mb-4">
+            <div class="text-subtitle-1 font-weight-bold mb-4 d-flex align-center">
               Folder Visibility
+              <InfoTooltip text="How many folders are set to public (isPublic = true) vs. private. Public folders are accessible via a shared link without the app." />
             </div>
 
             <v-skeleton-loader v-if="engagementStore.loading" type="image" height="240" />
@@ -117,8 +123,9 @@ function handleRefresh() {
       <v-col cols="12" md="4">
         <v-card height="100%">
           <v-card-text>
-            <div class="text-subtitle-1 font-weight-bold mb-4">
+            <div class="text-subtitle-1 font-weight-bold mb-4 d-flex align-center">
               Notification Read Rate
+              <InfoTooltip text="Proportion of notification documents where isRead = true. A low read rate suggests notifications may not be relevant or timely enough." />
             </div>
 
             <v-skeleton-loader v-if="engagementStore.loading" type="image" height="240" />
@@ -140,8 +147,9 @@ function handleRefresh() {
       <v-col cols="12">
         <v-card>
           <v-card-text>
-            <div class="text-subtitle-1 font-weight-bold mb-4">
+            <div class="text-subtitle-1 font-weight-bold mb-4 d-flex align-center">
               Top Folders by Visits
+              <InfoTooltip text="The 10 folders with the highest visits count, sorted descending. Requires a Firestore composite index on folders: isDeleted + visits." />
             </div>
 
             <v-skeleton-loader v-if="engagementStore.loading" type="image" height="320" />

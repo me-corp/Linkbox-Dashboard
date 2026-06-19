@@ -1,4 +1,6 @@
 <script setup>
+import InfoTooltip from '@/components/common/InfoTooltip.vue'
+
 defineProps({
   title: String,
   value: [String, Number],
@@ -21,6 +23,11 @@ defineProps({
     type: String,
     default: '',
   },
+  // optional explanation shown in an info tooltip next to the title
+  tooltip: {
+    type: String,
+    default: '',
+  },
   loading: {
     type: Boolean,
     default: false,
@@ -37,8 +44,9 @@ defineProps({
 
       <div v-else class="d-flex justify-space-between align-start">
         <div class="stats-content">
-          <div class="stats-title">
+          <div class="stats-title d-flex align-center">
             {{ title }}
+            <InfoTooltip v-if="tooltip" :text="tooltip" />
           </div>
 
           <div class="stats-value">
