@@ -39,6 +39,8 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
         getFoldersAudience,
         updateFolderAudienceFields,
         bulkUpdateFoldersAudience,
+        calculateUserCounts,
+        applyUserCounts,
     } from '@/services/dataIntegrityService'
 
     import ConfirmUserUpdateDialog
@@ -927,6 +929,50 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
             updating.value = false
         }
     }
+
+    // ---- Migration: recalculate user counters ----
+
+    const migrationRunning = ref(false)
+    const migrationResult = ref(null) // null | { processed, linkCounts, folderCounts, addedFolderCounts }
+
+    async function runCounterMigration() {
+        migrationRunning.value = true
+        migrationResult.value = null
+
+        try {
+            const { linkCounts, folderCounts, addedFolderCounts } =
+                await calculateUserCounts()
+
+            const userIds = usersStore.users.map(u => u.id)
+
+            const processed = await applyUserCounts(
+                userIds,
+                linkCounts,
+                folderCounts,
+                addedFolderCounts,
+            )
+
+            // Patch in-memory user objects so the stale-users view reflects
+            // the corrected counts immediately without a full reload.
+            usersStore.users.forEach(user => {
+                user.linksCount = linkCounts[user.id] || 0
+                user.foldersCount = folderCounts[user.id] || 0
+                user.addedFoldersCount = addedFolderCounts[user.id] || 0
+            })
+
+            await logAdminAction({
+                action: 'migration_recalculate_user_counters',
+                performedBy: { email: 'harsha@linkbox.store' },
+                usersUpdated: processed,
+            })
+
+            migrationResult.value = { processed }
+        } catch (error) {
+            console.error(error)
+        } finally {
+            migrationRunning.value = false
+        }
+    }
 </script>
 
 <template>
@@ -1348,6 +1394,49 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
                 </template>
             </v-data-table>
         </template>
+    </div>
+
+    <!-- ---- Migrations ---- -->
+    <div class="mt-8">
+        <h1 class="mb-4">Migrations</h1>
+
+        <v-card>
+            <v-card-text class="d-flex align-center ga-4 flex-wrap">
+                <div>
+                    <div class="text-subtitle-1 font-weight-bold">
+                        Recalculate User Counters
+                    </div>
+                    <div class="text-caption text-medium-emphasis">
+                        Counts each user's actual links, owned folders, and added folders directly
+                        from Firestore, then writes the corrected values to
+                        <code>linksCount</code>, <code>foldersCount</code>, and
+                        <code>addedFoldersCount</code> on every user document.
+                        Run this once to fix counters for users created before the triggers were deployed.
+                        Requires users to be loaded first (Users section above).
+                    </div>
+                </div>
+
+                <v-spacer />
+
+                <v-btn
+                    color="warning"
+                    :loading="migrationRunning"
+                    :disabled="!usersStore.users.length"
+                    @click="runCounterMigration"
+                >
+                    Run Migration
+                </v-btn>
+            </v-card-text>
+
+            <v-divider v-if="migrationResult" />
+
+            <v-card-text v-if="migrationResult">
+                <v-alert type="success" variant="tonal" density="comfortable">
+                    Migration complete — updated counters for
+                    <strong>{{ migrationResult.processed }}</strong> users.
+                </v-alert>
+            </v-card-text>
+        </v-card>
     </div>
 
     <ConfirmUserUpdateDialog v-model="showDialog" :user="selectedItem?.user

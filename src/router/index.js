@@ -43,6 +43,12 @@ const routes = [
           import("@/views/dashboard/PowerUsersView.vue"),
       },
       {
+        path: 'stale-users',
+        meta: { title: "Stale Users" },
+        component: () =>
+          import('@/views/dashboard/StaleUsersView.vue'),
+      },
+      {
         path: 'integrity',
         meta: { title: "Data Integrity" },
         component: () =>

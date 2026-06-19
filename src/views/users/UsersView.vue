@@ -8,17 +8,11 @@
     import { useUsersStore }
         from '@/stores/usersStore'
 
-    import { useLinksStore }
-        from '@/stores/linksStore'
-
     import UserDetailsDrawer
         from '@/components/users/UserDetailsDrawer.vue'
 
     const usersStore =
         useUsersStore()
-
-    const linksStore =
-        useLinksStore()
 
     const search = ref('')
 
@@ -55,14 +49,8 @@
     const updatedAtDate =
         ref(null)
 
-    onMounted(async () => {
-        await usersStore.loadUsers()
-        
-        // Load links count for all users in parallel
-        const linksCounts = usersStore.users.map(user =>
-            linksStore.loadUserLinksCount(user.id)
-        )
-        await Promise.allSettled(linksCounts)
+    onMounted(() => {
+        usersStore.loadUsers()
     })
 
     const filteredUsers =
@@ -259,9 +247,7 @@
 
                     // Filter by links count
                     const userLinksCount =
-                        linksStore.userLinksCount[
-                            user.id
-                        ] || 0
+                        user.linksCount ?? 0
 
                     if (
                         linksCountFilter.value ===
@@ -281,10 +267,6 @@
 
                     return true
                 })
-                .map(user => ({
-                    ...user,
-                    linksCount: linksStore.userLinksCount[user.id] || 0,
-                }))
         })
 
     function viewUser(user) {
@@ -323,6 +305,14 @@
         {
             title: 'Links',
             key: 'linksCount',
+        },
+        {
+            title: 'Folders',
+            key: 'foldersCount',
+        },
+        {
+            title: 'Added Folders',
+            key: 'addedFoldersCount',
         },
         {
             title: 'Last Activity',
@@ -519,11 +509,31 @@
 
         <template v-slot:[`item.linksCount`]="{ item }">
             <v-chip
-                :color="item.linksCount > 0 ? 'success' : 'grey'"
+                :color="(item.linksCount ?? 0) > 0 ? 'success' : 'grey'"
                 size="small"
                 variant="tonal"
             >
-                {{ item.linksCount }}
+                {{ item.linksCount ?? 0 }}
+            </v-chip>
+        </template>
+
+        <template v-slot:[`item.foldersCount`]="{ item }">
+            <v-chip
+                :color="(item.foldersCount ?? 0) > 0 ? 'success' : 'grey'"
+                size="small"
+                variant="tonal"
+            >
+                {{ item.foldersCount ?? 0 }}
+            </v-chip>
+        </template>
+
+        <template v-slot:[`item.addedFoldersCount`]="{ item }">
+            <v-chip
+                :color="(item.addedFoldersCount ?? 0) > 0 ? 'primary' : 'grey'"
+                size="small"
+                variant="tonal"
+            >
+                {{ item.addedFoldersCount ?? 0 }}
             </v-chip>
         </template>
 

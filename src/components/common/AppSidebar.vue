@@ -29,6 +29,7 @@ const navGroups = [
       { title: 'Retention', icon: 'mdi-fire', route: '/retention' },
       { title: 'Engagement', icon: 'mdi-lightning-bolt-outline', route: '/engagement' },
       { title: 'Power Users', icon: 'mdi-crown-outline', route: '/power-users' },
+      { title: 'Stale Users', icon: 'mdi-account-clock-outline', route: '/stale-users' },
     ],
   },
   {
