@@ -1,0 +1,26 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Proxy: LinkBox scrapper API
+# Forwards /api/scrapper/* → scrapper Cloud Run service server-side,
+# so the browser never makes a cross-origin request (no CORS issue).
+[[redirects]]
+  from   = "/api/scrapper/*"
+  to     = "https://scrapper-linkbox-store-93100653399.asia-south1.run.app/:splat"
+  status = 200
+  force  = true
+
+# Proxy: linkpreview.net API
+[[redirects]]
+  from   = "/api/linkpreview/*"
+  to     = "https://api.linkpreview.net/:splat"
+  status = 200
+  force  = true
+
+# SPA fallback — serves index.html for all routes so Vue Router handles them.
+# Fixes the "page not found" on refresh for any non-root route.
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200

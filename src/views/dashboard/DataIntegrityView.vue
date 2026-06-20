@@ -43,6 +43,14 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
         applyUserCounts,
     } from '@/services/dataIntegrityService'
 
+    import {
+        getLinksMissingPreview,
+        fetchBothPreviews,
+        applyLinkPreview,
+        buildDisplayUpdates,
+        runPreviewMigration,
+    } from '@/services/linkPreviewMigrationService'
+
     import ConfirmUserUpdateDialog
         from '@/components/dialogs/ConfirmUserUpdateDialog.vue'
     import ConfirmFixDialog
@@ -51,6 +59,10 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
         from '@/components/dialogs/ConfirmBulkFixDialog.vue'
     import ConfirmCreateMappingDialog
         from '@/components/dialogs/ConfirmCreateMappingDialog.vue'
+    import ConfirmPreviewDialog
+        from '@/components/dialogs/ConfirmPreviewDialog.vue'
+    import ConfirmBulkPreviewDialog
+        from '@/components/dialogs/ConfirmBulkPreviewDialog.vue'
     // selectedItems in the table for bulk actions
     const selectedItems = ref([])
 
@@ -973,6 +985,210 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
             migrationRunning.value = false
         }
     }
+
+    // ---- Migration: backfill link previews ----
+
+    const previewToken       = ref(import.meta.env.VITE_METADATA_API_TOKEN || '')
+    const linkPreviewNetKey  = ref(import.meta.env.VITE_LINKPREVIEW_NET_KEY  || '')
+
+    const previewMigrationRunning  = ref(false)
+    const previewMigrationProgress = ref(null)
+    const previewMigrationResult   = ref(null)
+    const previewLinksCount        = ref(null)
+    const previewLinksCountLoading = ref(false)
+
+    async function loadPreviewLinksCount() {
+        previewLinksCountLoading.value = true
+        try {
+            const links = await getLinksMissingPreview()
+            previewLinksCount.value = links.length
+        } catch (error) {
+            console.error(error)
+        } finally {
+            previewLinksCountLoading.value = false
+        }
+    }
+
+    async function startPreviewMigration() {
+        if (!previewToken.value.trim()) return
+
+        previewMigrationRunning.value  = true
+        previewMigrationProgress.value = null
+        previewMigrationResult.value   = null
+
+        try {
+            const result = await runPreviewMigration(
+                previewToken.value.trim(),
+                linkPreviewNetKey.value.trim(),
+                progress => { previewMigrationProgress.value = { ...progress } }
+            )
+
+            previewMigrationResult.value = result
+
+            await logAdminAction({
+                action: 'migration_backfill_link_previews',
+                performedBy: { email: 'harsha@linkbox.store' },
+                ...result,
+            })
+        } catch (error) {
+            console.error(error)
+        } finally {
+            previewMigrationRunning.value = false
+        }
+    }
+
+    // ---- Link Previews integrity section ----
+
+    const linkPreviewRows    = ref([])
+    const linkPreviewLoading = ref(false)
+    const linkPreviewLoaded  = ref(false)
+
+    const linkPreviewHeaders = [
+        { title: 'Title / URL',    key: 'title',         sortable: false },
+        { title: 'Status',         key: 'previewStatus', sortable: false },
+        { title: 'Actions',        key: 'actions',       sortable: false },
+    ]
+
+    async function loadLinkPreviews() {
+        linkPreviewLoading.value = true
+        try {
+            linkPreviewRows.value = await getLinksMissingPreview()
+            linkPreviewLoaded.value = true
+        } catch (error) {
+            console.error(error)
+        } finally {
+            linkPreviewLoading.value = false
+        }
+    }
+
+    // ---- single preview fix ----
+
+    const fetchingPreviewFor = ref(new Set())
+    const showPreviewDialog  = ref(false)
+    // { link, scraper, linkPreview, displayUpdates }
+    const pendingPreviewItem = ref(null)
+
+    async function fetchSinglePreview(link) {
+        if (!previewToken.value.trim()) return
+
+        fetchingPreviewFor.value = new Set([...fetchingPreviewFor.value, link.id])
+
+        try {
+            const url = (link.link || link.url || '').trim()
+            const { scraper, linkPreview } = await fetchBothPreviews(
+                url,
+                previewToken.value.trim(),
+                linkPreviewNetKey.value.trim(),
+            )
+            const displayUpdates = buildDisplayUpdates(link, scraper, linkPreview)
+            pendingPreviewItem.value = { link, scraper, linkPreview, displayUpdates }
+            showPreviewDialog.value  = true
+        } catch (error) {
+            console.error('Preview fetch failed:', error)
+        } finally {
+            const next = new Set(fetchingPreviewFor.value)
+            next.delete(link.id)
+            fetchingPreviewFor.value = next
+        }
+    }
+
+    async function confirmSinglePreview() {
+        const { link, scraper, linkPreview } = pendingPreviewItem.value
+
+        try {
+            updating.value = true
+
+            const updates = await applyLinkPreview(link, scraper, linkPreview)
+
+            await logAdminAction({
+                action: 'apply_link_preview',
+                performedBy: { email: 'harsha@linkbox.store' },
+                linkId: link.id,
+                previewTitle: (linkPreview?.title || scraper?.title) ?? '',
+                previewUrl:   (scraper?.url || linkPreview?.url) ?? '',
+            })
+
+            linkPreviewRows.value = linkPreviewRows.value.filter(l => l.id !== link.id)
+            Object.assign(link, updates)
+
+            showPreviewDialog.value  = false
+            pendingPreviewItem.value = null
+        } catch (error) {
+            console.error(error)
+        } finally {
+            updating.value = false
+        }
+    }
+
+    // ---- bulk preview fix ----
+
+    const selectedPreviewItems     = ref([])
+    const showBulkPreviewDialog    = ref(false)
+    const bulkPreviewFetching      = ref(false)
+    const bulkPreviewFetchProgress = ref(null)
+    // [{ link, scraper, linkPreview }]
+    const bulkPreviewFetched       = ref([])
+
+    async function fetchBulkPreviews() {
+        if (!previewToken.value.trim() || !selectedPreviewItems.value.length) return
+
+        bulkPreviewFetching.value      = true
+        bulkPreviewFetchProgress.value = { done: 0, total: selectedPreviewItems.value.length }
+        bulkPreviewFetched.value       = []
+
+        for (const link of selectedPreviewItems.value) {
+            const url = (link.link || link.url || '').trim()
+
+            try {
+                const { scraper, linkPreview } = await fetchBothPreviews(
+                    url,
+                    previewToken.value.trim(),
+                    linkPreviewNetKey.value.trim(),
+                )
+                bulkPreviewFetched.value.push({ link, scraper, linkPreview })
+            } catch {
+                // Skip — link stays in the list for retry
+            }
+
+            bulkPreviewFetchProgress.value = {
+                done:  bulkPreviewFetchProgress.value.done + 1,
+                total: bulkPreviewFetchProgress.value.total,
+            }
+        }
+
+        bulkPreviewFetching.value = false
+
+        if (bulkPreviewFetched.value.length) {
+            showBulkPreviewDialog.value = true
+        }
+    }
+
+    async function confirmBulkPreview() {
+        try {
+            updating.value = true
+
+            for (const { link, scraper, linkPreview } of bulkPreviewFetched.value) {
+                const updates = await applyLinkPreview(link, scraper, linkPreview)
+                Object.assign(link, updates)
+                linkPreviewRows.value = linkPreviewRows.value.filter(l => l.id !== link.id)
+            }
+
+            await logAdminAction({
+                action: 'bulk_apply_link_previews',
+                performedBy: { email: 'harsha@linkbox.store' },
+                count: bulkPreviewFetched.value.length,
+                linkIds: bulkPreviewFetched.value.map(i => i.link.id).slice(0, 200),
+            })
+
+            selectedPreviewItems.value  = []
+            bulkPreviewFetched.value    = []
+            showBulkPreviewDialog.value = false
+        } catch (error) {
+            console.error(error)
+        } finally {
+            updating.value = false
+        }
+    }
 </script>
 
 <template>
@@ -1396,6 +1612,135 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
         </template>
     </div>
 
+    <!-- ---- Link Previews ---- -->
+    <div class="mt-8">
+        <h1 class="mb-4">Link Previews</h1>
+
+        <v-card class="mb-4">
+            <v-card-text class="d-flex align-center ga-4 flex-wrap">
+                <div>
+                    <div class="text-subtitle-1 font-weight-bold">Link Preview Check</div>
+                    <div class="text-caption text-medium-emphasis">
+                        Finds links without a fetched preview (<code>previewStatus ≠ fetched</code>).
+                        Select rows and fetch previews individually or in bulk, then confirm before writing.
+                    </div>
+                </div>
+                <v-spacer />
+                <v-btn color="primary" :loading="linkPreviewLoading" @click="loadLinkPreviews">
+                    {{ linkPreviewLoaded ? 'Re-run Check' : 'Run Check' }}
+                </v-btn>
+            </v-card-text>
+        </v-card>
+
+        <template v-if="linkPreviewLoaded">
+            <!-- Token inputs — shared with the Migrations section below -->
+            <div class="d-flex flex-wrap ga-3 mb-4">
+                <v-text-field
+                    v-model="previewToken"
+                    label="Scrapper token (x-linkbox-token)"
+                    placeholder="Same as LINKBOX_METADATA_TOKEN"
+                    type="password"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    style="max-width: 380px"
+                />
+                <v-text-field
+                    v-model="linkPreviewNetKey"
+                    label="linkpreview.net API key"
+                    placeholder="X-Linkpreview-Api-Key value"
+                    type="password"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                    style="max-width: 320px"
+                />
+            </div>
+
+            <v-alert type="warning" variant="tonal" class="mb-4">
+                <strong>{{ linkPreviewRows.length }}</strong> links are missing a preview
+            </v-alert>
+
+            <!-- Bulk action bar -->
+            <v-card v-if="selectedPreviewItems.length" class="mb-4">
+                <v-card-text class="d-flex align-center ga-4 flex-wrap">
+                    <strong>{{ selectedPreviewItems.length }} selected</strong>
+
+                    <v-btn
+                        color="primary"
+                        :loading="bulkPreviewFetching"
+                        :disabled="!previewToken.trim()"
+                        @click="fetchBulkPreviews"
+                    >
+                        Fetch Previews for Selected
+                    </v-btn>
+
+                    <v-btn variant="text" @click="selectedPreviewItems = []">Clear</v-btn>
+
+                    <template v-if="bulkPreviewFetching && bulkPreviewFetchProgress">
+                        <span class="text-caption text-medium-emphasis">
+                            Fetching {{ bulkPreviewFetchProgress.done }} /
+                            {{ bulkPreviewFetchProgress.total }}…
+                        </span>
+                        <v-progress-linear
+                            :model-value="(bulkPreviewFetchProgress.done / bulkPreviewFetchProgress.total) * 100"
+                            color="primary"
+                            height="4"
+                            rounded
+                            style="max-width: 200px"
+                        />
+                    </template>
+                </v-card-text>
+            </v-card>
+
+            <v-data-table
+                v-model="selectedPreviewItems"
+                :headers="linkPreviewHeaders"
+                :items="linkPreviewRows"
+                :item-value="row => row.id"
+                show-select
+                return-object
+                :items-per-page="25"
+                class="elevation-1"
+            >
+                <template v-slot:[`item.title`]="{ item }">
+                    <div>
+                        <div class="font-weight-medium text-body-2">
+                            {{ item.title || '(no title)' }}
+                        </div>
+                        <div class="text-caption text-medium-emphasis text-truncate" style="max-width: 320px">
+                            {{ item.link || item.url }}
+                        </div>
+                    </div>
+                </template>
+
+                <template v-slot:[`item.previewStatus`]="{ item }">
+                    <v-chip
+                        size="small"
+                        :color="item.previewStatus === 'failed' ? 'error'
+                              : item.previewStatus === 'fetching' ? 'warning'
+                              : 'grey'"
+                        variant="tonal"
+                    >
+                        {{ item.previewStatus || 'none' }}
+                    </v-chip>
+                </template>
+
+                <template v-slot:[`item.actions`]="{ item }">
+                    <v-btn
+                        color="primary"
+                        size="small"
+                        :loading="fetchingPreviewFor.has(item.id)"
+                        :disabled="!previewToken.trim() || fetchingPreviewFor.has(item.id)"
+                        @click="fetchSinglePreview(item)"
+                    >
+                        Fetch Preview
+                    </v-btn>
+                </template>
+            </v-data-table>
+        </template>
+    </div>
+
     <!-- ---- Migrations ---- -->
     <div class="mt-8">
         <h1 class="mb-4">Migrations</h1>
@@ -1436,6 +1781,99 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
                     <strong>{{ migrationResult.processed }}</strong> users.
                 </v-alert>
             </v-card-text>
+        </v-card>
+
+        <!-- Link Preview Migration -->
+        <v-card class="mt-4">
+            <v-card-text class="d-flex align-center ga-4 flex-wrap">
+                <div>
+                    <div class="text-subtitle-1 font-weight-bold">
+                        Backfill Link Previews
+                    </div>
+                    <div class="text-caption text-medium-emphasis">
+                        Fetches title, description, image, and favicon for every link that
+                        doesn't have a preview yet (<code>previewStatus ≠ fetched</code>)
+                        by calling the LinkBox scrapper API. Blocked domains (e.g. Flipkart)
+                        are skipped. Rate-limited to ~120 req/min.
+                    </div>
+                </div>
+
+                <v-spacer />
+
+                <div class="d-flex align-center ga-2">
+                    <v-btn
+                        variant="outlined"
+                        size="small"
+                        :loading="previewLinksCountLoading"
+                        @click="loadPreviewLinksCount"
+                    >
+                        Count links
+                    </v-btn>
+
+                    <v-chip v-if="previewLinksCount !== null" size="small" color="warning" variant="tonal">
+                        {{ previewLinksCount }} links need previews
+                    </v-chip>
+                </div>
+            </v-card-text>
+
+            <v-divider />
+
+            <v-card-text>
+                <div class="text-caption text-medium-emphasis mb-3">
+                    Uses the API token entered in the Link Previews section above.
+                </div>
+
+                <v-btn
+                    color="warning"
+                    :loading="previewMigrationRunning"
+                    :disabled="!previewToken.trim()"
+                    @click="startPreviewMigration"
+                >
+                    Run Migration
+                </v-btn>
+            </v-card-text>
+
+            <template v-if="previewMigrationProgress || previewMigrationResult">
+                <v-divider />
+
+                <v-card-text>
+                    <!-- Progress bar while running -->
+                    <template v-if="previewMigrationRunning && previewMigrationProgress">
+                        <div class="text-body-2 mb-2">
+                            Processing {{ previewMigrationProgress.processed }} of
+                            {{ previewMigrationProgress.total }} links…
+                        </div>
+                        <v-progress-linear
+                            :model-value="previewMigrationProgress.total
+                                ? (previewMigrationProgress.processed / previewMigrationProgress.total) * 100
+                                : 0"
+                            color="warning"
+                            height="8"
+                            rounded
+                            class="mb-3"
+                        />
+                        <div class="d-flex ga-4 text-caption text-medium-emphasis">
+                            <span>✓ {{ previewMigrationProgress.succeeded }} succeeded</span>
+                            <span>✗ {{ previewMigrationProgress.failed }} failed</span>
+                            <span>⊘ {{ previewMigrationProgress.skipped }} skipped</span>
+                        </div>
+                    </template>
+
+                    <!-- Result after completion -->
+                    <v-alert
+                        v-if="previewMigrationResult"
+                        type="success"
+                        variant="tonal"
+                        density="comfortable"
+                    >
+                        Migration complete — processed
+                        <strong>{{ previewMigrationResult.total }}</strong> links:
+                        <strong>{{ previewMigrationResult.succeeded }}</strong> fetched,
+                        <strong>{{ previewMigrationResult.failed }}</strong> failed,
+                        <strong>{{ previewMigrationResult.skipped }}</strong> skipped (blocked domains).
+                    </v-alert>
+                </v-card-text>
+            </template>
         </v-card>
     </div>
 
@@ -1514,5 +1952,22 @@ from '@/components/dialogs/ConfirmBulkUserUpdateDialog.vue'
         :field-counts="audienceFieldCounts"
         :loading="updating"
         @confirm="confirmBulkAudienceFix"
+    />
+
+    <ConfirmPreviewDialog
+        v-model="showPreviewDialog"
+        :link="pendingPreviewItem?.link"
+        :scraper="pendingPreviewItem?.scraper"
+        :link-preview="pendingPreviewItem?.linkPreview"
+        :display-updates="pendingPreviewItem?.displayUpdates"
+        :loading="updating"
+        @confirm="confirmSinglePreview"
+    />
+
+    <ConfirmBulkPreviewDialog
+        v-model="showBulkPreviewDialog"
+        :items="bulkPreviewFetched"
+        :loading="updating"
+        @confirm="confirmBulkPreview"
     />
 </template>
