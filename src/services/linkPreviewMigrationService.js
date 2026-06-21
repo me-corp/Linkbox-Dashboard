@@ -153,20 +153,23 @@ function buildPreviewObject(scraper, linkPreview, fallbackUrl) {
 export function buildLinkPreviewUpdates(link, scraper, linkPreview) {
   const preview = buildPreviewObject(scraper, linkPreview, link.link || link.url || '')
 
+  // System / metadata fields — always written
   const updates = {
     previewStatus:    'fetched',
     preview,
-    // Flat fields read by the Flutter app
-    imageUrl:         preview.image,
-    imageHeight:      0.0,
-    imageWidth:       0.0,
     previewFetchedAt: serverTimestamp(),
     updatedAt:        serverTimestamp(),
   }
 
-  // Only backfill text fields when the link has no value yet
+  // Content fields — never overwrite an existing value.
+  // String fields: skip if the link already has a non-empty value.
+  // Numeric fields: use == null so we skip when the field is 0 (valid) but
+  //   still write when it truly doesn't exist on the document.
+  if (!link.imageUrl    && preview.image)       updates.imageUrl    = preview.image
   if (!link.title       && preview.title)       updates.title       = preview.title
   if (!link.description && preview.description) updates.description = preview.description
+  if (link.imageHeight == null)                 updates.imageHeight = 0.0
+  if (link.imageWidth  == null)                 updates.imageWidth  = 0.0
 
   return updates
 }
