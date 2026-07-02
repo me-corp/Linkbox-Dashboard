@@ -1,12 +1,14 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/authStore'
+import { usePermissions } from '@/composables/usePermissions'
 import { logout } from '@/services/authService'
 
-const router = useRouter()
+const router    = useRouter()
 const authStore = useAuthStore()
+const { isAdmin, hasPermission, hasAnyWithPrefix } = usePermissions()
 
 const rail = ref(
   localStorage.getItem('sidebarCollapsed') === 'true'
@@ -19,29 +21,56 @@ watch(rail, value => {
 const navGroups = [
   {
     items: [
-      { title: 'Overview', icon: 'mdi-view-dashboard-outline', route: '/' },
+      {
+        title: 'Overview',
+        icon:  'mdi-view-dashboard-outline',
+        route: '/',
+        permission: 'analytics:overview:view',
+      },
     ],
   },
   {
     label: 'Insights',
     items: [
-      { title: 'Growth', icon: 'mdi-chart-line', route: '/growth' },
-      { title: 'Retention', icon: 'mdi-fire', route: '/retention' },
-      { title: 'Engagement', icon: 'mdi-lightning-bolt-outline', route: '/engagement' },
-      { title: 'Power Users', icon: 'mdi-crown-outline', route: '/power-users' },
-      { title: 'Stale Users', icon: 'mdi-account-clock-outline', route: '/stale-users' },
+      { title: 'Growth',       icon: 'mdi-chart-line',           route: '/growth',       permission: 'analytics:growth:view' },
+      { title: 'Retention',    icon: 'mdi-fire',                 route: '/retention',    permission: 'analytics:retention:view' },
+      { title: 'Engagement',   icon: 'mdi-lightning-bolt-outline',route: '/engagement',  permission: 'analytics:engagement:view' },
+      { title: 'Power Users',  icon: 'mdi-crown-outline',        route: '/power-users',  permission: 'analytics:power_users:view' },
+      { title: 'Stale Users',  icon: 'mdi-account-clock-outline',route: '/stale-users',  permissionPrefix: 'stale_users:' },
     ],
   },
   {
     label: 'Manage',
     items: [
-      { title: 'Users', icon: 'mdi-account-group-outline', route: '/users' },
-      { title: 'Data Integrity', icon: 'mdi-database-check-outline', route: '/integrity' },
-      { title: 'Submissions', icon: 'mdi-tray-full', route: '/submissions' },
-      { title: 'Settings', icon: 'mdi-cog-outline', route: '/settings' },
+      { title: 'Users',          icon: 'mdi-account-group-outline',    route: '/users',       permissionPrefix: 'users:' },
+      { title: 'Data Integrity', icon: 'mdi-database-check-outline',   route: '/integrity',   permissionPrefix: 'data_integrity:' },
+      { title: 'Submissions',    icon: 'mdi-tray-full',                route: '/submissions', permissionPrefix: 'submissions:' },
+      { title: 'Settings',       icon: 'mdi-cog-outline',              route: '/settings',    permission: 'settings:view' },
+      { title: 'Team',           icon: 'mdi-shield-account-outline',   route: '/team',        adminOnly: true },
     ],
   },
 ]
+
+function isItemVisible(item) {
+  if (isAdmin.value) return true
+  if (item.adminOnly) return false
+  if (item.permission) return hasPermission(item.permission)
+  if (item.permissionPrefix) return hasAnyWithPrefix(item.permissionPrefix)
+  return true
+}
+
+const visibleGroups = computed(() =>
+  navGroups
+    .map(group => ({ ...group, items: group.items.filter(isItemVisible) }))
+    .filter(group => group.items.length > 0)
+)
+
+const roleLabel = computed(() => {
+  const role = authStore.teamMember?.role
+  if (role === 'admin') return 'Admin'
+  if (role === 'member') return 'Member'
+  return ''
+})
 
 async function handleLogout() {
   await logout()
@@ -94,7 +123,7 @@ async function handleLogout() {
     <v-divider class="mb-2" />
 
     <v-list nav density="comfortable" class="sidebar-nav">
-      <template v-for="(group, gIndex) in navGroups" :key="gIndex">
+      <template v-for="(group, gIndex) in visibleGroups" :key="gIndex">
         <v-list-subheader v-if="group.label && !rail">
           {{ group.label }}
         </v-list-subheader>
@@ -110,7 +139,7 @@ async function handleLogout() {
           class="sidebar-item mb-1"
         />
 
-        <v-divider v-if="gIndex < navGroups.length - 1" class="my-2" />
+        <v-divider v-if="gIndex < visibleGroups.length - 1" class="my-2" />
       </template>
     </v-list>
 
@@ -126,7 +155,7 @@ async function handleLogout() {
           <div class="footer-email text-truncate">
             {{ authStore.user?.email }}
           </div>
-          <div class="footer-role">Administrator</div>
+          <div class="footer-role">{{ roleLabel }}</div>
         </div>
 
         <v-spacer v-if="!rail" />

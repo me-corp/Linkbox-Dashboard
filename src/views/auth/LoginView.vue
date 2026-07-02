@@ -5,6 +5,7 @@
 
   import { login, getAuthErrorMessage } from "@/services/authService";
   import { useAuthStore } from "@/stores/authStore";
+  import { fetchTeamMemberByEmail } from "@/services/teamService";
 
   const router = useRouter();
   const authStore = useAuthStore();
@@ -70,6 +71,10 @@
       );
 
       authStore.setUser(user);
+
+      // Fetch team access before navigating so the route guard has teamMember
+      const member = await fetchTeamMemberByEmail(user.email).catch(() => null)
+      authStore.setTeamMember(member)
 
       router.push("/");
     } catch (error) {

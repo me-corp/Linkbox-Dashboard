@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
@@ -11,7 +11,15 @@ const firebaseConfig = {
   appId: "1:938571460769:web:4cc288d3218aa75e5ec0e0",
   measurementId: "G-B46Y1KB729"
 }
+
 const app = initializeApp(firebaseConfig);
 
-export const db = getFirestore(app);
-export const auth = getAuth(app);
+// Secondary app instance used only for creating new Firebase Auth users
+// from the admin panel without signing out the current admin session.
+const secondaryApp =
+  getApps().find(a => a.name === 'secondary') ??
+  initializeApp(firebaseConfig, 'secondary')
+
+export const db             = getFirestore(app);
+export const auth           = getAuth(app);
+export const secondaryAuth  = getAuth(secondaryApp);

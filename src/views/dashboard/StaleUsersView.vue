@@ -5,6 +5,9 @@ import { useUsersStore } from '@/stores/usersStore'
 import UserDetailsDrawer from '@/components/users/UserDetailsDrawer.vue'
 import InfoTooltip from '@/components/common/InfoTooltip.vue'
 import { getUserMaxVersions } from '@/services/dataIntegrityService'
+import { usePermissions } from '@/composables/usePermissions'
+
+const { hasPermission } = usePermissions()
 
 const usersStore = useUsersStore()
 
@@ -135,17 +138,22 @@ const unknownVersionCount = computed(() =>
 
 // ---- table ----
 
-const headers = [
-    { title: 'User',           key: 'name',              sortable: false },
-    { title: 'Type',           key: 'isGuest',           sortable: false },
-    { title: 'App Version',    key: 'appVersion',        sortable: false },
-    { title: 'Last Active',    key: 'lastActivityAt'                     },
-    { title: 'Links',          key: 'linksCount'                         },
-    { title: 'Folders',        key: 'foldersCount'                       },
-    { title: 'Added Folders',  key: 'addedFoldersCount'                  },
-    { title: 'Joined',         key: 'createdAt'                          },
-    { title: '',               key: 'view',              sortable: false },
-]
+const headers = computed(() => {
+    const cols = [
+        { title: 'User',          key: 'name',            sortable: false },
+        { title: 'Type',          key: 'isGuest',         sortable: false },
+        { title: 'App Version',   key: 'appVersion',      sortable: false },
+        { title: 'Last Active',   key: 'lastActivityAt'                   },
+        { title: 'Links',         key: 'linksCount'                       },
+        { title: 'Folders',       key: 'foldersCount'                     },
+        { title: 'Added Folders', key: 'addedFoldersCount'                },
+        { title: 'Joined',        key: 'createdAt'                        },
+    ]
+    if (hasPermission('stale_users:user_details:view')) {
+        cols.push({ title: '', key: 'view', sortable: false })
+    }
+    return cols
+})
 
 // ---- drawer ----
 
@@ -311,148 +319,167 @@ function displayName(user) {
         <!-- Results -->
         <template v-if="!usersStore.loading">
 
-            <v-alert type="warning" variant="tonal" class="mb-4">
-                <strong>{{ staleUsers.length }}</strong> stale users
-                ({{ stalePct }}% of {{ usersStore.users.length }} total)
-                inactive for more than {{ inactiveDays }} days
-            </v-alert>
+            <!-- Insights — requires stale_users:insights:view -->
+            <template v-if="hasPermission('stale_users:insights:view')">
+                <v-alert type="warning" variant="tonal" class="mb-4">
+                    <strong>{{ staleUsers.length }}</strong> stale users
+                    ({{ stalePct }}% of {{ usersStore.users.length }} total)
+                    inactive for more than {{ inactiveDays }} days
+                </v-alert>
 
-            <v-row class="mb-4">
-                <v-col cols="12" sm="3">
-                    <v-card variant="tonal" color="warning">
-                        <v-card-text class="text-center">
-                            <div class="text-h5 font-weight-black">{{ neverActiveCount }}</div>
-                            <div class="text-caption d-flex align-center justify-center">
-                                Never active
-                                <InfoTooltip text="Users with no lastActivityAt field — signed up but never triggered an activity event." />
-                            </div>
-                        </v-card-text>
-                    </v-card>
-                </v-col>
+                <v-row class="mb-4">
+                    <v-col cols="12" sm="3">
+                        <v-card variant="tonal" color="warning">
+                            <v-card-text class="text-center">
+                                <div class="text-h5 font-weight-black">{{ neverActiveCount }}</div>
+                                <div class="text-caption d-flex align-center justify-center">
+                                    Never active
+                                    <InfoTooltip text="Users with no lastActivityAt field — signed up but never triggered an activity event." />
+                                </div>
+                            </v-card-text>
+                        </v-card>
+                    </v-col>
 
-                <v-col cols="12" sm="3">
-                    <v-card variant="tonal" color="error">
-                        <v-card-text class="text-center">
-                            <div class="text-h5 font-weight-black">{{ unknownVersionCount }}</div>
-                            <div class="text-caption d-flex align-center justify-center">
-                                Unknown version
-                                <InfoTooltip text="Stale users with no devices_info record — likely on an old version that didn't track activity or never logged in after install." />
-                            </div>
-                        </v-card-text>
-                    </v-card>
-                </v-col>
+                    <v-col cols="12" sm="3">
+                        <v-card variant="tonal" color="error">
+                            <v-card-text class="text-center">
+                                <div class="text-h5 font-weight-black">{{ unknownVersionCount }}</div>
+                                <div class="text-caption d-flex align-center justify-center">
+                                    Unknown version
+                                    <InfoTooltip text="Stale users with no devices_info record — likely on an old version that didn't track activity or never logged in after install." />
+                                </div>
+                            </v-card-text>
+                        </v-card>
+                    </v-col>
 
-                <v-col cols="12" sm="3">
-                    <v-card variant="tonal" color="error">
-                        <v-card-text class="text-center">
-                            <div class="text-h5 font-weight-black">{{ zeroLinksCount }}</div>
-                            <div class="text-caption d-flex align-center justify-center">
-                                0 links
-                                <InfoTooltip text="Users where the linksCount field on their user document is 0 or missing." />
-                            </div>
-                        </v-card-text>
-                    </v-card>
-                </v-col>
+                    <v-col cols="12" sm="3">
+                        <v-card variant="tonal" color="error">
+                            <v-card-text class="text-center">
+                                <div class="text-h5 font-weight-black">{{ zeroLinksCount }}</div>
+                                <div class="text-caption d-flex align-center justify-center">
+                                    0 links
+                                    <InfoTooltip text="Users where the linksCount field on their user document is 0 or missing." />
+                                </div>
+                            </v-card-text>
+                        </v-card>
+                    </v-col>
 
-                <v-col cols="12" sm="3">
-                    <v-card variant="tonal" color="error">
-                        <v-card-text class="text-center">
-                            <div class="text-h5 font-weight-black">{{ zeroFoldersCount }}</div>
-                            <div class="text-caption d-flex align-center justify-center">
-                                0 folders
-                                <InfoTooltip text="Users where the foldersCount field on their user document is 0 or missing." />
-                            </div>
-                        </v-card-text>
-                    </v-card>
-                </v-col>
-            </v-row>
+                    <v-col cols="12" sm="3">
+                        <v-card variant="tonal" color="error">
+                            <v-card-text class="text-center">
+                                <div class="text-h5 font-weight-black">{{ zeroFoldersCount }}</div>
+                                <div class="text-caption d-flex align-center justify-center">
+                                    0 folders
+                                    <InfoTooltip text="Users where the foldersCount field on their user document is 0 or missing." />
+                                </div>
+                            </v-card-text>
+                        </v-card>
+                    </v-col>
+                </v-row>
+            </template>
 
-            <!-- Table -->
-            <v-data-table
-                :headers="headers"
-                :items="staleUsers"
-                :items-per-page="50"
-                class="elevation-1"
-            >
-                <template v-slot:[`item.name`]="{ item }">
-                    <div class="d-flex align-center ga-2 py-2">
-                        <v-avatar size="32" color="surface-bright">
-                            <v-img v-if="item.pic" :src="item.pic" cover />
-                            <v-icon v-else color="primary" size="18">mdi-account</v-icon>
-                        </v-avatar>
-                        <div>
-                            <div class="font-weight-bold text-body-2">{{ displayName(item) }}</div>
-                            <div v-if="item.username" class="text-caption text-medium-emphasis">
-                                @{{ item.username }}
+            <!-- Table — requires stale_users:table:view -->
+            <template v-if="hasPermission('stale_users:table:view')">
+                <v-data-table
+                    :headers="headers"
+                    :items="staleUsers"
+                    :items-per-page="50"
+                    class="elevation-1"
+                >
+                    <template v-slot:[`item.name`]="{ item }">
+                        <div class="d-flex align-center ga-2 py-2">
+                            <v-avatar size="32" color="surface-bright">
+                                <v-img v-if="item.pic" :src="item.pic" cover />
+                                <v-icon v-else color="primary" size="18">mdi-account</v-icon>
+                            </v-avatar>
+                            <div>
+                                <div class="font-weight-bold text-body-2">{{ displayName(item) }}</div>
+                                <div v-if="item.username" class="text-caption text-medium-emphasis">
+                                    @{{ item.username }}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </template>
+                    </template>
 
-                <template v-slot:[`item.isGuest`]="{ item }">
-                    <v-chip
-                        size="small"
-                        :color="item.isGuest ? undefined : 'primary'"
-                        variant="tonal"
-                    >
-                        {{ item.isGuest ? 'Guest' : 'Registered' }}
-                    </v-chip>
-                </template>
+                    <template v-slot:[`item.isGuest`]="{ item }">
+                        <v-chip
+                            size="small"
+                            :color="item.isGuest ? undefined : 'primary'"
+                            variant="tonal"
+                        >
+                            {{ item.isGuest ? 'Guest' : 'Registered' }}
+                        </v-chip>
+                    </template>
 
-                <template v-slot:[`item.appVersion`]="{ item }">
-                    <v-chip
-                        size="small"
-                        :color="userVersions[item.id] ? undefined : 'warning'"
-                        variant="tonal"
-                    >
-                        {{ userVersions[item.id] || 'Unknown' }}
-                    </v-chip>
-                </template>
+                    <template v-slot:[`item.appVersion`]="{ item }">
+                        <v-chip
+                            size="small"
+                            :color="userVersions[item.id] ? undefined : 'warning'"
+                            variant="tonal"
+                        >
+                            {{ userVersions[item.id] || 'Unknown' }}
+                        </v-chip>
+                    </template>
 
-                <template v-slot:[`item.lastActivityAt`]="{ item }">
-                    <span :class="{ 'text-error font-weight-bold': !item.lastActivityAt }">
-                        {{ item.lastActivityAt ? formatDate(item.lastActivityAt) : 'Never' }}
-                    </span>
-                </template>
+                    <template v-slot:[`item.lastActivityAt`]="{ item }">
+                        <span :class="{ 'text-error font-weight-bold': !item.lastActivityAt }">
+                            {{ item.lastActivityAt ? formatDate(item.lastActivityAt) : 'Never' }}
+                        </span>
+                    </template>
 
-                <template v-slot:[`item.linksCount`]="{ item }">
-                    <v-chip
-                        size="small"
-                        :color="(item.linksCount ?? 0) === 0 ? 'error' : undefined"
-                        variant="tonal"
-                    >
-                        {{ item.linksCount ?? 0 }}
-                    </v-chip>
-                </template>
+                    <template v-slot:[`item.linksCount`]="{ item }">
+                        <v-chip
+                            size="small"
+                            :color="(item.linksCount ?? 0) === 0 ? 'error' : undefined"
+                            variant="tonal"
+                        >
+                            {{ item.linksCount ?? 0 }}
+                        </v-chip>
+                    </template>
 
-                <template v-slot:[`item.foldersCount`]="{ item }">
-                    <v-chip
-                        size="small"
-                        :color="(item.foldersCount ?? 0) === 0 ? 'error' : undefined"
-                        variant="tonal"
-                    >
-                        {{ item.foldersCount ?? 0 }}
-                    </v-chip>
-                </template>
+                    <template v-slot:[`item.foldersCount`]="{ item }">
+                        <v-chip
+                            size="small"
+                            :color="(item.foldersCount ?? 0) === 0 ? 'error' : undefined"
+                            variant="tonal"
+                        >
+                            {{ item.foldersCount ?? 0 }}
+                        </v-chip>
+                    </template>
 
-                <template v-slot:[`item.addedFoldersCount`]="{ item }">
-                    {{ item.addedFoldersCount ?? 0 }}
-                </template>
+                    <template v-slot:[`item.addedFoldersCount`]="{ item }">
+                        {{ item.addedFoldersCount ?? 0 }}
+                    </template>
 
-                <template v-slot:[`item.createdAt`]="{ item }">
-                    {{ formatDate(item.createdAt) }}
-                </template>
+                    <template v-slot:[`item.createdAt`]="{ item }">
+                        {{ formatDate(item.createdAt) }}
+                    </template>
 
-                <template v-slot:[`item.view`]="{ item }">
-                    <v-btn icon variant="text" @click="viewUser(item)">
-                        <v-icon>mdi-eye</v-icon>
-                    </v-btn>
-                </template>
-            </v-data-table>
+                    <!-- Eye icon — only if user_details permission -->
+                    <template v-if="hasPermission('stale_users:user_details:view')" v-slot:[`item.view`]="{ item }">
+                        <v-btn icon variant="text" @click="viewUser(item)">
+                            <v-icon>mdi-eye</v-icon>
+                        </v-btn>
+                    </template>
+                </v-data-table>
+            </template>
+
+            <!-- No access to either section -->
+            <v-alert
+                v-if="!hasPermission('stale_users:insights:view') && !hasPermission('stale_users:table:view')"
+                type="warning"
+                variant="tonal"
+            >
+                You don't have permission to view insights or the user table for this section.
+            </v-alert>
         </template>
 
         <v-skeleton-loader v-else type="table" />
     </div>
 
-    <UserDetailsDrawer v-model="showDrawer" :user="selectedUser" />
+    <UserDetailsDrawer
+        v-if="hasPermission('stale_users:user_details:view')"
+        v-model="showDrawer"
+        :user="selectedUser"
+    />
 </template>

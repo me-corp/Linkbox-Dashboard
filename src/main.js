@@ -9,6 +9,7 @@ import router from './router'
 import vuetify from './plugins/vuetify'
 import { auth } from './firebase/config'
 import { useAuthStore } from './stores/authStore'
+import { fetchTeamMemberByEmail } from './services/teamService'
 
 import './style.css'
 
@@ -24,8 +25,18 @@ const authStore = useAuthStore(pinia)
 new Promise((resolve) => {
   let resolved = false
 
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     authStore.setUser(user)
+
+    if (user) {
+      try {
+        const member = await fetchTeamMemberByEmail(user.email)
+        authStore.setTeamMember(member)
+      } catch {
+        authStore.setTeamMember(null)
+      }
+    }
+    // setUser(null) already calls setTeamMember(null) + sets initialized
 
     if (!resolved) {
       resolved = true
