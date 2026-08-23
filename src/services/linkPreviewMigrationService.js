@@ -38,9 +38,10 @@ function abortSignal() {
 }
 
 // ---- linkpreview.net -------------------------------------------------------
-// Priority for: imageUrl, title, description
-// POST https://api.linkpreview.net  { q: url }
+// Priority for: imageUrl, title, description, imageWidth/imageHeight
+// POST https://api.linkpreview.net  { q: url, fields: 'image_x,image_y' }
 // Header: X-Linkpreview-Api-Key
+// `fields` requests image dimensions on top of the default title/description/image/url.
 
 async function fetchFromLinkPreviewNet(url, apiKey) {
   const response = await fetch(LINKPREVIEW_BASE_URL, {
@@ -49,7 +50,7 @@ async function fetchFromLinkPreviewNet(url, apiKey) {
       'Content-Type': 'application/json',
       'X-Linkpreview-Api-Key': apiKey,
     },
-    body: JSON.stringify({ q: url }),
+    body: JSON.stringify({ q: url, fields: 'image_x,image_y' }),
     signal: abortSignal(),
   })
 
@@ -59,11 +60,17 @@ async function fetchFromLinkPreviewNet(url, apiKey) {
     throw new Error(`linkpreview.net returned ${response.status}`)
   }
 
+  const num = v => (Number.isFinite(Number(v)) ? Number(v) : 0)
+
+  // Keep the raw response intact; normalise the fields we rely on.
   return {
+    ...data,
     title:       data.title       || '',
     description: data.description || '',
     image:       data.image       || '',
     url:         data.url         || url,
+    imageWidth:  num(data.image_x),
+    imageHeight: num(data.image_y),
   }
 }
 
@@ -121,23 +128,28 @@ function buildPreviewObject(scraper, linkPreview, fallbackUrl) {
   const str = v => (typeof v === 'string' ? v : '')
   const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {})
 
+  // Keep EVERYTHING the scrapper returned (metadata, oembed, and any future
+  // fields) — only strip the transport envelope flags.
+  const { success, error, ...scraped } = obj(scraper)
+
   // Basic fields: linkpreview.net wins, scraper is fallback
-  const title       = str(linkPreview?.title       || scraper?.title)
-  const description = str(linkPreview?.description || scraper?.description)
-  const image       = str(linkPreview?.image       || scraper?.image)
+  const title       = str(linkPreview?.title       || scraped.title)
+  const description = str(linkPreview?.description || scraped.description)
+  const image       = str(linkPreview?.image       || scraped.image)
 
   return {
+    ...scraped,
     status:      'fetched',
     fetchedAt:   serverTimestamp(),
-    source:      'linkbox-metadata-api',
-    url:         str(scraper?.url || linkPreview?.url) || fallbackUrl,
-    provider:    str(scraper?.provider),
-    type:        str(scraper?.type) || 'website',
+    source:      str(scraped.source) || 'linkbox-metadata-api',
+    url:         str(scraped.url || linkPreview?.url) || fallbackUrl,
+    provider:    str(scraped.provider),
+    type:        str(scraped.type) || 'website',
     title,
     description,
     image,
-    favicon:     str(scraper?.favicon),
-    metadata:    obj(scraper?.metadata),
+    favicon:     str(scraped.favicon),
+    metadata:    obj(scraped.metadata),
   }
 }
 
@@ -148,7 +160,7 @@ function buildPreviewObject(scraper, linkPreview, fallbackUrl) {
  * Field priority:
  *   imageUrl, title, description  →  linkpreview.net first, scraper fallback
  *   favicon, provider, type, metadata  →  scraper only
- *   imageHeight, imageWidth  →  always 0.0 (neither API returns dimensions)
+ *   imageHeight, imageWidth  →  linkpreview.net (image_x / image_y), 0.0 fallback
  */
 export function buildLinkPreviewUpdates(link, scraper, linkPreview) {
   const preview = buildPreviewObject(scraper, linkPreview, link.link || link.url || '')
@@ -163,44 +175,43 @@ export function buildLinkPreviewUpdates(link, scraper, linkPreview) {
 
   // Content fields — never overwrite an existing value.
   // String fields: skip if the link already has a non-empty value.
-  // Numeric fields: use == null so we skip when the field is 0 (valid) but
-  //   still write when it truly doesn't exist on the document.
   if (!link.imageUrl    && preview.image)       updates.imageUrl    = preview.image
   if (!link.title       && preview.title)       updates.title       = preview.title
   if (!link.description && preview.description) updates.description = preview.description
-  if (link.imageHeight == null)                 updates.imageHeight = 0.0
-  if (link.imageWidth  == null)                 updates.imageWidth  = 0.0
+
+  // Dimensions from linkpreview.net. A stored 0 is a placeholder, not a real
+  // value, so fetched dimensions may replace it — but never a non-zero one.
+  // When we got no dimensions, only backfill 0.0 on docs missing the field.
+  const height = linkPreview?.imageHeight > 0 ? linkPreview.imageHeight : 0
+  const width  = linkPreview?.imageWidth  > 0 ? linkPreview.imageWidth  : 0
+
+  if (height && !(link.imageHeight > 0)) updates.imageHeight = height
+  else if (link.imageHeight == null)     updates.imageHeight = 0.0
+
+  if (width && !(link.imageWidth > 0))   updates.imageWidth  = width
+  else if (link.imageWidth == null)      updates.imageWidth  = 0.0
 
   return updates
 }
 
 /**
  * Returns a display-safe version of the updates (no serverTimestamp sentinels).
+ * Shows the FULL updates object — exactly what will be written — so nothing
+ * looks like it was dropped in the confirm dialog.
  */
 export function buildDisplayUpdates(link, scraper, linkPreview) {
-  const raw = buildLinkPreviewUpdates(link, scraper, linkPreview)
-
-  const display = {}
-  for (const [k, v] of Object.entries(raw)) {
-    if (k === 'preview') {
-      // Show preview as a flat summary rather than the full object
-      display[k] = {
-        title:       raw.preview.title,
-        description: raw.preview.description,
-        image:       raw.preview.image,
-        favicon:     raw.preview.favicon,
-        provider:    raw.preview.provider,
-        type:        raw.preview.type,
-        source:      raw.preview.source,
-      }
-    } else if (v && typeof v === 'object' && 'seconds' in v) {
-      display[k] = '<server timestamp>'
-    } else {
-      display[k] = v
+  const clean = v => {
+    if (v && typeof v === 'object') {
+      // serverTimestamp() sentinel or a Firestore Timestamp instance
+      if (typeof v._methodName === 'string') return '<server timestamp>'
+      if ('seconds' in v || typeof v.toDate === 'function') return '<timestamp>'
+      if (Array.isArray(v)) return v.map(clean)
+      return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, clean(x)]))
     }
+    return v
   }
 
-  return display
+  return clean(buildLinkPreviewUpdates(link, scraper, linkPreview))
 }
 
 /**

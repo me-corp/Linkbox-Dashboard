@@ -40,6 +40,11 @@ const routes = [
         component: () => import("@/views/dashboard/PowerUsersView.vue"),
       },
       {
+        path: "feature-insights",
+        meta: { title: "Feature Insights", permissionPrefix: "insights:" },
+        component: () => import("@/views/dashboard/FeatureInsightsView.vue"),
+      },
+      {
         path: "stale-users",
         meta: { title: "Stale Users", permissionPrefix: "stale_users:" },
         component: () => import("@/views/dashboard/StaleUsersView.vue"),

@@ -6,6 +6,12 @@ export const PERMISSIONS = {
   ANALYTICS_ENGAGEMENT:  'analytics:engagement:view',
   ANALYTICS_POWER_USERS: 'analytics:power_users:view',
 
+  // Feature Insights — a growing collection of smaller, feature-specific
+  // insight panels (one tab each) that don't warrant their own top-level
+  // analytics page. Add one leaf permission per new panel/tab here.
+  INSIGHTS_GUEST_CONVERSION: 'insights:guest_conversion:view',
+  INSIGHTS_LOGIN_SCREEN: 'insights:login_screen:view',
+
   // Stale Users
   STALE_USERS_INSIGHTS:     'stale_users:insights:view',
   STALE_USERS_TABLE:        'stale_users:table:view',
@@ -55,6 +61,14 @@ export const PERMISSION_GROUPS = [
       { label: 'Retention',   perm: PERMISSIONS.ANALYTICS_RETENTION },
       { label: 'Engagement',  perm: PERMISSIONS.ANALYTICS_ENGAGEMENT },
       { label: 'Power Users', perm: PERMISSIONS.ANALYTICS_POWER_USERS },
+    ],
+  },
+  {
+    key: 'insights',
+    label: 'Feature Insights',
+    items: [
+      { label: 'Guest Conversion', perm: PERMISSIONS.INSIGHTS_GUEST_CONVERSION },
+      { label: 'Login Screen', perm: PERMISSIONS.INSIGHTS_LOGIN_SCREEN },
     ],
   },
   {

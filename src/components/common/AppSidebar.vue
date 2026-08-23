@@ -36,6 +36,7 @@ const navGroups = [
       { title: 'Retention',    icon: 'mdi-fire',                 route: '/retention',    permission: 'analytics:retention:view' },
       { title: 'Engagement',   icon: 'mdi-lightning-bolt-outline',route: '/engagement',  permission: 'analytics:engagement:view' },
       { title: 'Power Users',  icon: 'mdi-crown-outline',        route: '/power-users',  permission: 'analytics:power_users:view' },
+      { title: 'Feature Insights', icon: 'mdi-lightbulb-on-outline', route: '/feature-insights', permissionPrefix: 'insights:' },
       { title: 'Stale Users',  icon: 'mdi-account-clock-outline',route: '/stale-users',  permissionPrefix: 'stale_users:' },
     ],
   },

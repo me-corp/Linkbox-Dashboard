@@ -23,6 +23,8 @@ const featureToggles = [
   { key: 'showRateMeUpdate', label: "Show 'Rate Us' Prompt", hint: 'Periodically ask users to rate the app.' },
   { key: 'showPingMeUpdate', label: "Show 'PingMe' Update", hint: 'Promote the PingMe feature/waitlist to users.' },
   { key: 'showMoreAppsUpdate', label: "Show 'More Apps' Update", hint: 'Cross-promote other AppsByMe apps.' },
+  { key: 'guestLoginEnabled', label: 'Guest Login Enabled', hint: 'Show the "Continue as guest" option on the login screen.' },
+  { key: 'promptGuestConversion', label: 'Prompt Guest Conversion', hint: 'Nudge already-active guests to log in, on every app open.' },
 ]
 
 function toDatetimeLocal(timestamp) {
@@ -55,6 +57,10 @@ function buildForm(config) {
     showRateMeUpdate: config.showRateMeUpdate ?? false,
     showPingMeUpdate: config.showPingMeUpdate ?? false,
     showMoreAppsUpdate: config.showMoreAppsUpdate ?? false,
+
+    guestLoginEnabled: config.guestLoginEnabled ?? true,
+    promptGuestConversion: config.promptGuestConversion ?? false,
+    forceGuestConversionHardBlock: config.forceGuestConversionHardBlock ?? false,
   }
 }
 
@@ -212,6 +218,17 @@ function handleSaveClick() {
                     color="primary"
                     :label="toggle.label"
                     :hint="toggle.hint"
+                    persistent-hint
+                    inset
+                  />
+                </v-col>
+
+                <v-col v-if="form.promptGuestConversion" cols="12" sm="6" md="4">
+                  <v-switch
+                    v-model="form.forceGuestConversionHardBlock"
+                    color="error"
+                    label="Hard Block Guests"
+                    hint="Make the guest-conversion prompt non-dismissible instead of a soft nudge."
                     persistent-hint
                     inset
                   />
